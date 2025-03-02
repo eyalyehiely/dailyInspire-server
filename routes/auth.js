@@ -64,7 +64,8 @@ router.post('/login', async (req, res) => {
       user: {
         id: user.id,
         email: user.email,
-        full_name: user.full_name,
+        first_name: user.first_name,
+        last_name: user.last_name,
         preferredTime: user.preferredTime,
         timezone: user.timezone,
         quotesEnabled: user.quotesEnabled
@@ -163,7 +164,8 @@ router.get('/preferences', auth, async (req, res) => {
       success: true,
       preferences: {
         email: user.email,
-        full_name: user.full_name,
+        first_name: user.first_name,
+        last_name: user.last_name,
         preferredTime: user.preferredTime,
         timezone: user.timezone,
         quotesEnabled: user.quotesEnabled
@@ -179,7 +181,7 @@ router.get('/preferences', auth, async (req, res) => {
 router.put('/preferences', auth, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { preferredTime, timezone, quotesEnabled, full_name } = req.body;
+    const { preferredTime, timezone, quotesEnabled, first_name, last_name } = req.body;
     
     // Find user
     const user = await User.findById(userId);
@@ -189,8 +191,12 @@ router.put('/preferences', auth, async (req, res) => {
     }
     
     // Update fields if provided
-    if (full_name !== undefined) {
-      user.full_name = full_name;
+    if (first_name !== undefined) {
+      user.first_name = first_name;
+    }
+
+    if (last_name !== undefined) {
+      user.last_name = last_name;
     }
 
     
