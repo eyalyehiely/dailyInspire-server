@@ -59,6 +59,7 @@ router.post('/signup', async (req, res) => {
         }
       });
     }
+    let timezone=timeZone
     
     // Create a new user with all required fields
     const user = new User({
@@ -66,7 +67,7 @@ router.post('/signup', async (req, res) => {
       first_name,
       last_name,
       preferredTime,
-      timeZone,
+      timezone,
       password // Make sure to include the password
     });
     
