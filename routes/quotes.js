@@ -39,13 +39,13 @@ router.post('/send', async (req, res) => {
 // Update signup route to accept timezone and preferred time
 router.post('/signup', async (req, res) => {
   try {
-    const { email, first_name, last_name, preferredTime, timezone, password } = req.body;
+    const { email, first_name, last_name, preferredTime, timeZone, password } = req.body;
     
     // More detailed logging
     console.log('Received signup request with data structure:', JSON.stringify(req.body, null, 2));
     
     // Validate required fields
-    if (!email || !first_name || !last_name || !password || !preferredTime || !timezone) {
+    if (!email || !first_name || !last_name || !password || !preferredTime || !timeZone) {
       console.log('Missing required fields');
       return res.status(400).json({ 
         message: 'Missing required fields', 
@@ -55,7 +55,7 @@ router.post('/signup', async (req, res) => {
           last_name: !last_name,
           password: !password,
           preferredTime: !preferredTime,
-          timezone: !timezone
+          timeZone: !timeZone
         }
       });
     }
@@ -66,7 +66,7 @@ router.post('/signup', async (req, res) => {
       first_name,
       last_name,
       preferredTime,
-      timezone,
+      timeZone,
       password // Make sure to include the password
     });
     
