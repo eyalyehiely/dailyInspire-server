@@ -45,7 +45,7 @@ router.post('/signup', async (req, res) => {
     console.log('Received signup request with data structure:', JSON.stringify(req.body, null, 2));
     
     // Validate required fields
-    if (!email || !first_name || !last_name || !password) {
+    if (!email || !first_name || !last_name || !password || !preferredTime || !timezone) {
       console.log('Missing required fields');
       return res.status(400).json({ 
         message: 'Missing required fields', 
@@ -53,7 +53,9 @@ router.post('/signup', async (req, res) => {
           email: !email,
           first_name: !first_name,
           last_name: !last_name,
-          password: !password
+          password: !password,
+          preferredTime: !preferredTime,
+          timezone: !timezone
         }
       });
     }
