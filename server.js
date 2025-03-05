@@ -26,7 +26,7 @@ app.use(cors({
 // Add this before your routes
 app.use((req, res, next) => {
   if (req.path.includes('/api/auth/login')) {
-    console.log('LOGIN REQUEST BODY:', JSON.stringify(req.body, null, 2));
+    console.log('LOGIN REQUEST BODY:', JSON.stringify(req.body.username, null, 2));
     console.log('CONTENT TYPE:', req.get('Content-Type'));
   }
   next();

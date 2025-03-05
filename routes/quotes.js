@@ -42,7 +42,7 @@ router.post('/signup', async (req, res) => {
     const { email, first_name, last_name, preferredTime, timeZone, password } = req.body;
     
     // More detailed logging
-    console.log('Received signup request with data structure:', JSON.stringify(req.body, null, 2));
+    console.log('Received signup request with data structure:');
     
     // Validate required fields
     if (!email || !first_name || !last_name || !password || !preferredTime || !timeZone) {
@@ -70,6 +70,8 @@ router.post('/signup', async (req, res) => {
       timezone,
       password // Make sure to include the password
     });
+    
+    console.log('Saving user with preferredTime:', preferredTime);
     
     await user.save();
     
