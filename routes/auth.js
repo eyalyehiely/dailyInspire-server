@@ -103,23 +103,54 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
-// Delete user account
-router.delete('/delete-account', auth, async (req, res) => {
+// Delete account route
+router.post('/delete-account', auth, async (req, res) => {
   try {
-    // Get user ID from the authenticated request
-    const userId = req.user.id;
+    const { email, password } = req.body;
     
-    // Find and delete the user
-    const deletedUser = await User.findByIdAndDelete(userId);
-    
-    if (!deletedUser) {
-      return res.status(404).json({ message: 'User not found' });
+    // Validate request
+    if (!email || !password) {
+      return res.status(400).json({ 
+        message: 'Email and password are required to delete account'
+      });
     }
     
-    res.status(200).json({ message: 'User account successfully deleted' });
+    // Ensure user can only delete their own account
+    if (email !== req.user.email) {
+      return res.status(403).json({
+        message: 'You can only delete your own account'
+      });
+    }
+    
+    // Find the user
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        message: 'User not found'
+      });
+    }
+    
+    // Verify password
+    const isMatch = await bcrypt.compare(password, user.password);
+    
+    if (!isMatch) {
+      return res.status(401).json({
+        message: 'Invalid password'
+      });
+    }
+    
+    // Delete the user
+    await User.findByIdAndDelete(req.user.id);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Account deleted successfully'
+    });
+    
   } catch (error) {
-    console.error('Error deleting user account:', error);
-    res.status(500).json({ message: 'Server error during account deletion' });
+    console.error('Error deleting account:', error);
+    res.status(500).json({ message: 'Server error while deleting account' });
   }
 });
 
