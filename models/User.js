@@ -24,6 +24,10 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  isPay: {
+    type: Boolean,
+    default: false
+  },
   preferredTime: {
     type: String,
     default: "07:00", // Default time (24-hour format)

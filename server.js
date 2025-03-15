@@ -4,6 +4,7 @@ const app = express();
 const port = 3000;
 const quoteRoutes = require('./routes/quotes');
 const authRoutes = require('./routes/auth');
+const paymentRoutes = require('./routes/payments');
 const connectDB = require('./config/db');
 const auth = require('./middleware/auth');
 
@@ -34,13 +35,12 @@ app.use((req, res, next) => {
 
 app.use('/api/quotes', quoteRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Protected route example
 app.get('/api/profile', auth, (req, res) => {
   res.json({ user: req.user });
 }); 
-
-
 
 // Initialize the scheduler when the server starts
 startScheduler();
