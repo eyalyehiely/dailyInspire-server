@@ -9,6 +9,20 @@ const nodemailer = require('nodemailer');
 const getTransporter = () => {
   // If in production, use configured email service
   if (process.env.NODE_ENV === 'production') {
+    // For Gmail, use SMTP settings directly instead of service
+    if (process.env.EMAIL_SERVICE?.toLowerCase() === 'gmail') {
+      return nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true, // use SSL
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASSWORD
+        }
+      });
+    }
+    
+    // For other services, use the service name
     return nodemailer.createTransport({
       service: process.env.EMAIL_SERVICE,
       auth: {
@@ -140,6 +154,12 @@ router.post('/forgot-password', async (req, res) => {
     // Send the email
     try {
       const transporter = getTransporter();
+      console.log('Email transport configured with:', {
+        service: process.env.EMAIL_SERVICE,
+        user: process.env.EMAIL_USER,
+        hasPassword: !!process.env.EMAIL_PASSWORD,
+        environment: process.env.NODE_ENV
+      });
       await transporter.sendMail(mailOptions);
       console.log(`Password reset email sent to ${user.email}`);
     } catch (emailError) {
