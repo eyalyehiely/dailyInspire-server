@@ -80,33 +80,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Add this test route
-router.post('/manage-user', async (req, res) => {
-  try {
-    const { email, action } = req.body;
 
-    if (!email || !action) {
-      return res.status(400).json({ message: 'Email and action are required.' });
-    }
-
-    let user;
-    switch (action) {
-      case 'delete':
-        user = await User.findOne({ email });
-        if (!user) {
-          return res.status(404).json({ message: 'User not found.' });
-        }
-        await User.deleteOne({ email });
-        res.json({ message: 'User deleted successfully' });
-        break;
-      default:
-        return res.status(400).json({ message: 'Invalid action.' });
-    }
-  } catch (error) {
-    console.error('User management error:', error);
-    res.status(500).json({ message: 'Error managing user', error: error.message });
-  }
-});
 
 // Add this route to reset a user's password
 router.post('/reset-password', async (req, res) => {
