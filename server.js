@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const paymentRoutes = require('./routes/payments');
 const connectDB = require('./config/db');
 const auth = require('./middleware/auth');
+const passwordResetRoutes = require('./routes/password-reset');
 
 // Import and start the scheduler
 const { startScheduler } = require('./controllers/scheduler');
@@ -36,6 +37,7 @@ app.use((req, res, next) => {
 app.use('/api/quotes', quoteRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api', passwordResetRoutes);
 
 // Protected route example
 app.get('/api/profile', auth, (req, res) => {
