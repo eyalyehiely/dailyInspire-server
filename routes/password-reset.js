@@ -8,41 +8,17 @@ const nodemailer = require('nodemailer');
 // Setup nodemailer for email sending
 const getTransporter = () => {
   // If in production, use configured email service
-  if (process.env.NODE_ENV === 'production') {
-    // For Gmail, use SMTP settings directly instead of service
-    if (process.env.EMAIL_SERVICE?.toLowerCase() === 'gmail') {
-      return nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true, // use SSL
-        auth: {
+    return nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true, // use SSL
+      auth: {
           user: process.env.EMAIL_USER,
           pass: process.env.EMAIL_PASSWORD
         }
       });
-    }
-    
-    // For other services, use the service name
-    return nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
   } 
   
-  // In development, use ethereal for testing (catches emails)
-  return nodemailer.createTransport({
-    host: 'smtp.ethereal.email',
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.ETHEREAL_EMAIL || 'ethereal.user@ethereal.email',
-      pass: process.env.ETHEREAL_PASSWORD || 'ethereal_pass'
-    }
-  });
-};
 
 // Implement rate limiting for security
 const resetRequestsMap = new Map();
@@ -105,7 +81,7 @@ router.post('/forgot-password', async (req, res) => {
     await user.save();
     
     // Create reset URL
-    const clientURL = process.env.CLIENT_URL || 'http://localhost:5173';
+    const clientURL = import.meta.env.VITE_CLIENT_URL || 'http://localhost:3000';
     const resetURL = `${clientURL}/reset-password/${resetToken}`;
     
     // Create email content
