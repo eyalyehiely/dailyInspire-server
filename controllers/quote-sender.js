@@ -31,12 +31,12 @@ async function sendQuoteEmail(email, quote) {
     service: process.env.EMAIL_SERVICE,
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
+      pass: process.env.EMAIL_PASSWORD
     }
   });
 
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: process.env.EMAIL_FROM || `Daily Inspiration <${process.env.EMAIL_USER}>`,
     to: email,
     subject: 'Your Daily Inspiration',
     html: `
@@ -68,12 +68,12 @@ async function sendSignUpEmail(email, quote) {
     service: process.env.EMAIL_SERVICE,
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
+      pass: process.env.EMAIL_PASSWORD
     }
   });
 
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: process.env.EMAIL_FROM || `Daily Inspiration <${process.env.EMAIL_USER}>`,
     to: email,
     subject: 'Thank you for signing up!',
     html: `

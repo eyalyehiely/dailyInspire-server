@@ -4,10 +4,10 @@ const nodemailer = require('nodemailer');
 const sendWelcomeEmail = async (user) => {
   try {
     const transporter = nodemailer.createTransport({
-      service: 'gmail', // or your email service
+      service: process.env.EMAIL_SERVICE || 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+        pass: process.env.EMAIL_PASSWORD
       }
     });
 
@@ -27,7 +27,7 @@ const sendWelcomeEmail = async (user) => {
     const formattedTime = timeFormat.format(new Date(`2000-01-01T${user.preferredTime || '09:00'}`));
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: process.env.EMAIL_FROM || `Daily Inspirational Quotes <${process.env.EMAIL_USER}>`,
       to: user.email,
       subject: 'Welcome to Daily Inspirational Quotes!',
       html: `
