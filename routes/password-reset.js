@@ -3,18 +3,8 @@ const router = express.Router();
 const crypto = require('crypto');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
-const nodemailer = require('nodemailer');
 
-// Setup nodemailer
-const transporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE || 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  }
-});
-
-// Route to request password reset - sends email with reset link
+// Route to request password reset - creates token without sending email (development version)
 router.post('/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -39,32 +29,26 @@ router.post('/forgot-password', async (req, res) => {
     user.resetPasswordExpires = resetTokenExpires;
     await user.save();
     
-    // Create reset URL
+    // Create reset URL (for reference only in development)
     const clientURL = process.env.CLIENT_URL || 'http://localhost:5173';
     const resetURL = `${clientURL}/reset-password/${resetToken}`;
     
-    // Send email
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || 'DailyInspire <noreply@dailyinspire.com>',
-      to: user.email,
-      subject: 'DailyInspire - Password Reset',
-      html: `
-        <h1>Reset Your Password</h1>
-        <p>Hello ${user.first_name},</p>
-        <p>We received a request to reset your password for your DailyInspire account.</p>
-        <p>Click the button below to reset your password:</p>
-        <a href="${resetURL}" style="display: inline-block; background-color: #4f46e5; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; margin: 20px 0;">Reset Password</a>
-        <p>This link will expire in 1 hour.</p>
-        <p>If you did not request a password reset, please ignore this email or contact support if you have concerns.</p>
-        <p>Best regards,</p>
-        <p>The DailyInspire Team</p>
-      `
-    };
+    // In a production environment, you would send an email here
+    console.log('Password reset token generated for', email);
+    console.log('Reset URL:', resetURL);
     
-    await transporter.sendMail(mailOptions);
+    // For development purposes, return the token in the response
+    // IMPORTANT: In production, you should remove this and send an email instead
+    const isDevelopment = process.env.NODE_ENV !== 'production';
     
     res.status(200).json({ 
-      message: 'If an account with that email exists, a password reset link has been sent.'
+      message: 'If an account with that email exists, a password reset link has been sent.',
+      ...(isDevelopment && { 
+        dev_info: {
+          reset_token: resetToken,
+          reset_url: resetURL
+        }
+      })
     });
     
   } catch (error) {
@@ -130,22 +114,8 @@ router.post('/reset-password', async (req, res) => {
     user.resetPasswordExpires = undefined;
     await user.save();
     
-    // Send confirmation email
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || 'DailyInspire <noreply@dailyinspire.com>',
-      to: user.email,
-      subject: 'DailyInspire - Password Changed Successfully',
-      html: `
-        <h1>Password Changed Successfully</h1>
-        <p>Hello ${user.first_name},</p>
-        <p>Your password has been changed successfully.</p>
-        <p>If you did not make this change, please contact our support team immediately.</p>
-        <p>Best regards,</p>
-        <p>The DailyInspire Team</p>
-      `
-    };
-    
-    await transporter.sendMail(mailOptions);
+    // Log success (instead of sending email)
+    console.log(`Password reset successful for user: ${user.email}`);
     
     res.status(200).json({ message: 'Password has been reset successfully' });
     
