@@ -4,14 +4,33 @@ const nodemailer = require('nodemailer');
 
 // Setup nodemailer for email sending
 const getTransporter = () => {
-  // If in production, use configured email service
-  return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASSWORD
-        }
-  });
+  // If EMAIL_HOST is set, use it directly
+  if (process.env.EMAIL_HOST) {
+    return nodemailer.createTransport({
+      host: process.env.EMAIL_HOST,
+      port: process.env.EMAIL_PORT || 587,
+      secure: process.env.EMAIL_SECURE === 'true',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+  }
+  
+  // Default to Gmail if no host is specified but we have Gmail credentials
+  if (process.env.EMAIL_USER && process.env.EMAIL_USER.includes('gmail.com')) {
+    return nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+  }
+  // Otherwise, throw an error
+  throw new Error('Email configuration is incomplete. Please set EMAIL_HOST, EMAIL_USER, and EMAIL_PASSWORD.');
 };
 
 
@@ -96,7 +115,6 @@ router.post('/', async (req, res) => {
         host: process.env.EMAIL_HOST,
         user: process.env.EMAIL_USER,
         hasPassword: !!process.env.EMAIL_PASSWORD,
-        environment: process.env.NODE_ENV
       });
       
       await transporter.sendMail(mailOptions);
