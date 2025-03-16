@@ -81,7 +81,7 @@ router.post('/forgot-password', async (req, res) => {
     await user.save();
     
     // Create reset URL
-    const clientURL = import.meta.env.VITE_CLIENT_URL || 'http://localhost:3000';
+    const clientURL = process.env.VITE_CLIENT_URL || 'http://localhost:3000';
     const resetURL = `${clientURL}/reset-password/${resetToken}`;
     
     // Create email content
