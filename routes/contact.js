@@ -4,21 +4,39 @@ const { google } = require('googleapis');
 
 // Google Sheets configuration
 const SPREADSHEET_ID = '1MCIpvpJGT6sLuqIENhzQcuOU1fgLmqXb9BHQr5MsMsk';
-const SHEET_NAME = 'Contact'; // Using a simpler sheet name without spaces
+const SHEET_NAME = 'Sheet1'; // Use the default sheet name
 
 // Create client with credentials
 const getGoogleSheetsClient = async () => {
   try {
-    // Check for credentials
-    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
-      throw new Error('Google Sheets credentials are missing. Set GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_PRIVATE_KEY.');
+    // Check for credentials and show detailed debug info
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL) {
+      console.error('Missing GOOGLE_SERVICE_ACCOUNT_EMAIL environment variable');
+      throw new Error('Google service account email is missing');
     }
+    
+    if (!process.env.GOOGLE_PRIVATE_KEY) {
+      console.error('Missing GOOGLE_PRIVATE_KEY environment variable');
+      throw new Error('Google private key is missing');
+    }
+    
+    console.log('Attempting to create auth with:', {
+      email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      hasPrivateKey: !!process.env.GOOGLE_PRIVATE_KEY,
+      privateKeyLength: process.env.GOOGLE_PRIVATE_KEY ? process.env.GOOGLE_PRIVATE_KEY.length : 0
+    });
 
+    // Fix private key formatting
+    const privateKey = process.env.GOOGLE_PRIVATE_KEY
+      .replace(/\\n/g, '\n')
+      .replace(/"-----/g, '-----')
+      .replace(/-----"/g, '-----');
+    
     // Google auth setup
     const auth = new google.auth.JWT(
       process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       null,
-      process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'), // Ensure newlines are properly handled
+      privateKey,
       ['https://www.googleapis.com/auth/spreadsheets']
     );
 
@@ -92,6 +110,8 @@ router.post('/', async (req, res) => {
     contactRequestsMap.set(email, [...userRequests, Date.now()]);
     
     try {
+      console.log('Contact form submission received from:', email);
+      
       // Get Google Sheets client
       const sheets = await getGoogleSheetsClient();
       
@@ -104,72 +124,86 @@ router.post('/', async (req, res) => {
         getIsraelDateTime() // Timestamp in Israel timezone
       ];
       
-      // Append data to spreadsheet
-      const response = await sheets.spreadsheets.values.append({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_NAME}!A:E`,
-        valueInputOption: 'USER_ENTERED',
-        resource: {
-          values: [rowData]
-        }
-      });
+      console.log('Attempting to append data to spreadsheet');
       
-      // Get the updated row number
-      const updatedRange = response.data.updates.updatedRange;
-      const rowNumber = parseInt(updatedRange.split(':')[0].match(/\d+/)[0]);
-      
-      // First, get the sheet ID
-      const sheetsResponse = await sheets.spreadsheets.get({
-        spreadsheetId: SPREADSHEET_ID,
-        fields: 'sheets.properties'
-      });
-      
-      // Find the sheet ID for our sheet name
-      const sheet = sheetsResponse.data.sheets.find(
-        sheet => sheet.properties.title === SHEET_NAME
-      );
-      
-      if (!sheet) {
-        throw new Error(`Sheet "${SHEET_NAME}" not found in the spreadsheet`);
-      }
-      
-      const sheetId = sheet.properties.sheetId;
-      
-      // Apply yellow formatting to the new row
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: SPREADSHEET_ID,
-        resource: {
-          requests: [{
-            updateCells: {
-              range: {
-                sheetId: sheetId, // Use the retrieved sheet ID
-                startRowIndex: rowNumber - 1,
-                endRowIndex: rowNumber,
-                startColumnIndex: 0,
-                endColumnIndex: 5 // A through E columns
-              },
-              rows: [{
-                values: Array(5).fill({
-                  userEnteredFormat: {
-                    backgroundColor: {
-                      red: 1.0,
-                      green: 0.95,
-                      blue: 0.6
-                    }
-                  }
-                })
-              }],
-              fields: 'userEnteredFormat.backgroundColor'
+      // First, get spreadsheet info to verify access and available sheets
+      try {
+        const sheetsInfo = await sheets.spreadsheets.get({
+          spreadsheetId: SPREADSHEET_ID
+        });
+        
+        console.log('Available sheets:', 
+          sheetsInfo.data.sheets.map(s => s.properties.title)
+        );
+        
+        // Use the first sheet if available
+        if (sheetsInfo.data.sheets && sheetsInfo.data.sheets.length > 0) {
+          const firstSheet = sheetsInfo.data.sheets[0].properties.title;
+          console.log('Using first available sheet:', firstSheet);
+          
+          // Append data to spreadsheet using the first sheet
+          const response = await sheets.spreadsheets.values.append({
+            spreadsheetId: SPREADSHEET_ID,
+            range: `${firstSheet}!A:E`,
+            valueInputOption: 'USER_ENTERED',
+            resource: {
+              values: [rowData]
             }
-          }]
+          });
+          
+          console.log('Data appended successfully:', response.data);
+          
+          // Apply yellow formatting if possible
+          try {
+            const sheetId = sheetsInfo.data.sheets[0].properties.sheetId;
+            const updatedRange = response.data.updates.updatedRange;
+            const rowNumber = parseInt(updatedRange.split(':')[0].match(/\d+/)[0]);
+            
+            await sheets.spreadsheets.batchUpdate({
+              spreadsheetId: SPREADSHEET_ID,
+              resource: {
+                requests: [{
+                  updateCells: {
+                    range: {
+                      sheetId: sheetId,
+                      startRowIndex: rowNumber - 1,
+                      endRowIndex: rowNumber,
+                      startColumnIndex: 0,
+                      endColumnIndex: 5
+                    },
+                    rows: [{
+                      values: Array(5).fill({
+                        userEnteredFormat: {
+                          backgroundColor: {
+                            red: 1.0,
+                            green: 0.95,
+                            blue: 0.6
+                          }
+                        }
+                      })
+                    }],
+                    fields: 'userEnteredFormat.backgroundColor'
+                  }
+                }]
+              }
+            });
+            
+            console.log('Row formatting applied successfully');
+          } catch (formatError) {
+            console.error('Error applying formatting (non-critical):', formatError.message);
+            // Continue even if formatting fails
+          }
+          
+          return res.status(200).json({ 
+            message: 'Message sent successfully! We\'ll get back to you soon.'
+          });
+        } else {
+          throw new Error('No sheets found in the spreadsheet');
         }
-      });
-      
-      console.log(`Contact form submission from ${name} (${email}) saved to Google Sheets`);
-      
-      return res.status(200).json({ 
-        message: 'Message sent successfully! We\'ll get back to you soon.'
-      });
+      } catch (sheetsError) {
+        console.error('Error accessing spreadsheet:', sheetsError);
+        throw new Error(`Could not access spreadsheet: ${sheetsError.message}`);
+      }
     } catch (sheetError) {
       console.error('Error saving to Google Sheets:', sheetError);
       return res.status(500).json({ 
