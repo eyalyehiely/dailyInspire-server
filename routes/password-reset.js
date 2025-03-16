@@ -132,7 +132,6 @@ router.post('/forgot-password', async (req, res) => {
         service: process.env.EMAIL_SERVICE,
         user: process.env.EMAIL_USER,
         hasPassword: !!process.env.EMAIL_PASSWORD,
-        environment: process.env.NODE_ENV
       });
       await transporter.sendMail(mailOptions);
       console.log(`Password reset email sent to ${user.email}`);
