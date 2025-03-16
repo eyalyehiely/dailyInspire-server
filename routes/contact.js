@@ -107,7 +107,7 @@ router.post('/', async (req, res) => {
       // Append data to spreadsheet
       const response = await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: `${SHEET_NAME}!A:E`,
+        range: `'${SHEET_NAME}'!A:E`,
         valueInputOption: 'USER_ENTERED',
         resource: {
           values: [rowData]
@@ -118,6 +118,23 @@ router.post('/', async (req, res) => {
       const updatedRange = response.data.updates.updatedRange;
       const rowNumber = parseInt(updatedRange.split(':')[0].match(/\d+/)[0]);
       
+      // First, get the sheet ID
+      const sheetsResponse = await sheets.spreadsheets.get({
+        spreadsheetId: SPREADSHEET_ID,
+        fields: 'sheets.properties'
+      });
+      
+      // Find the sheet ID for our sheet name
+      const sheet = sheetsResponse.data.sheets.find(
+        sheet => sheet.properties.title === SHEET_NAME
+      );
+      
+      if (!sheet) {
+        throw new Error(`Sheet "${SHEET_NAME}" not found in the spreadsheet`);
+      }
+      
+      const sheetId = sheet.properties.sheetId;
+      
       // Apply yellow formatting to the new row
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId: SPREADSHEET_ID,
@@ -125,7 +142,7 @@ router.post('/', async (req, res) => {
           requests: [{
             updateCells: {
               range: {
-                sheetId: 0, // Assuming it's the first sheet
+                sheetId: sheetId, // Use the retrieved sheet ID
                 startRowIndex: rowNumber - 1,
                 endRowIndex: rowNumber,
                 startColumnIndex: 0,
