@@ -9,9 +9,7 @@ const nodemailer = require('nodemailer');
 const getTransporter = () => {
   // If in production, use configured email service
     return nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true, // use SSL
+      service: process.env.EMAIL_SERVICE,
       auth: {
           user: process.env.EMAIL_USER,
           pass: process.env.EMAIL_PASSWORD
