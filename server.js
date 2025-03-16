@@ -8,6 +8,7 @@ const paymentRoutes = require('./routes/payments');
 const connectDB = require('./config/db');
 const auth = require('./middleware/auth');
 const passwordResetRoutes = require('./routes/password-reset');
+const contactRoutes = require('./routes/contact');
 
 // Import and start the scheduler
 const { startScheduler } = require('./controllers/scheduler');
@@ -38,6 +39,7 @@ app.use('/api/quotes', quoteRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api', passwordResetRoutes);
+app.use('/api/contact', contactRoutes);
 
 // Protected route example
 app.get('/api/profile', auth, (req, res) => {
