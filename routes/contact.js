@@ -93,7 +93,7 @@ router.post('/', async (req, res) => {
     try {
       const transporter = getTransporter();
       console.log('Sending contact form email with config:', {
-        service: process.env.EMAIL_SERVICE,
+        host: process.env.EMAIL_HOST,
         user: process.env.EMAIL_USER,
         hasPassword: !!process.env.EMAIL_PASSWORD,
         environment: process.env.NODE_ENV
@@ -102,18 +102,22 @@ router.post('/', async (req, res) => {
       await transporter.sendMail(mailOptions);
       console.log(`Contact form submission from ${name} (${email}) sent successfully`);
       
-      res.status(200).json({ 
+      return res.status(200).json({ 
         message: 'Message sent successfully! We\'ll get back to you soon.'
       });
     } catch (emailError) {
       console.error('Error sending contact form email:', emailError);
-      res.status(500).json({ 
-        message: 'Failed to send message. Please try again later.'
+      return res.status(500).json({ 
+        message: 'Failed to send message. Please try again later.',
+        error: emailError.message
       });
     }
   } catch (error) {
     console.error('Error in contact form handler:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ 
+      message: 'Internal server error',
+      error: error.message
+    });
   }
 });
 
