@@ -1,39 +1,48 @@
 const express = require('express');
 const router = express.Router();
-const nodemailer = require('nodemailer');
+const { google } = require('googleapis');
 
-// Setup nodemailer for email sending
-const getTransporter = () => {
-  // If EMAIL_HOST is set, use it directly
-  if (process.env.EMAIL_HOST) {
-    return nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port: process.env.EMAIL_PORT || 587,
-      secure: process.env.EMAIL_SECURE === 'true',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
+// Google Sheets configuration
+const SPREADSHEET_ID = '1MCIpvpJGT6sLuqIENhzQcuOU1fgLmqXb9BHQr5MsMsk';
+const SHEET_NAME = 'Customers support'; // Update this to your sheet name
+
+// Create client with credentials
+const getGoogleSheetsClient = async () => {
+  try {
+    // Check for credentials
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
+      throw new Error('Google Sheets credentials are missing. Set GOOGLE_SERVICE_ACCOUNT_EMAIL and GOOGLE_PRIVATE_KEY.');
+    }
+
+    // Google auth setup
+    const auth = new google.auth.JWT(
+      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      null,
+      process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'), // Ensure newlines are properly handled
+      ['https://www.googleapis.com/auth/spreadsheets']
+    );
+
+    // Create Google Sheets API client
+    return google.sheets({ version: 'v4', auth });
+  } catch (error) {
+    console.error('Error creating Google Sheets client:', error);
+    throw error;
   }
-  
-  // Default to Gmail if no host is specified but we have Gmail credentials
-  if (process.env.EMAIL_USER && process.env.EMAIL_USER.includes('gmail.com')) {
-    return nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
-  }
-  // Otherwise, throw an error
-  throw new Error('Email configuration is incomplete. Please set EMAIL_HOST, EMAIL_USER, and EMAIL_PASSWORD.');
 };
 
-
+// Format date in Israel time zone
+const getIsraelDateTime = () => {
+  return new Date().toLocaleString('en-US', { 
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+};
 
 // Implement rate limiting for security
 const contactRequestsMap = new Map();
@@ -82,52 +91,73 @@ router.post('/', async (req, res) => {
     const userRequests = contactRequestsMap.get(email) || [];
     contactRequestsMap.set(email, [...userRequests, Date.now()]);
     
-    // Create email content
-    const emailContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-        <h2>New Contact Form Submission</h2>
-        
-        <div style="margin: 20px 0;">
-          <p><strong>Name:</strong> ${name}</p>
-          <p><strong>Email:</strong> ${email}</p>
-        </div>
-        
-        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="margin-top: 0; color: #333;">Message:</h3>
-          <p>${message.replace(/\n/g, '<br>')}</p>
-        </div>
-      </div>
-    `;
-    
-    // Configure email options
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || `Contact Form <${process.env.EMAIL_USER}>`,
-      to: process.env.EMAIL_USER,
-      subject: `Contact Form: Message from ${name}`,
-      html: emailContent,
-      replyTo: email // Set reply-to to the sender's email
-    };
-    
-    // Send the email
     try {
-      const transporter = getTransporter();
-      console.log('Sending contact form email with config:', {
-        host: process.env.EMAIL_HOST,
-        user: process.env.EMAIL_USER,
-        hasPassword: !!process.env.EMAIL_PASSWORD,
+      // Get Google Sheets client
+      const sheets = await getGoogleSheetsClient();
+      
+      // Prepare row data
+      const rowData = [
+        name,
+        email,
+        message,
+        'new', // Status
+        getIsraelDateTime() // Timestamp in Israel timezone
+      ];
+      
+      // Append data to spreadsheet
+      const response = await sheets.spreadsheets.values.append({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `${SHEET_NAME}!A:E`,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [rowData]
+        }
       });
       
-      await transporter.sendMail(mailOptions);
-      console.log(`Contact form submission from ${name} (${email}) sent successfully`);
+      // Get the updated row number
+      const updatedRange = response.data.updates.updatedRange;
+      const rowNumber = parseInt(updatedRange.split(':')[0].match(/\d+/)[0]);
+      
+      // Apply yellow formatting to the new row
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SPREADSHEET_ID,
+        resource: {
+          requests: [{
+            updateCells: {
+              range: {
+                sheetId: 0, // Assuming it's the first sheet
+                startRowIndex: rowNumber - 1,
+                endRowIndex: rowNumber,
+                startColumnIndex: 0,
+                endColumnIndex: 5 // A through E columns
+              },
+              rows: [{
+                values: Array(5).fill({
+                  userEnteredFormat: {
+                    backgroundColor: {
+                      red: 1.0,
+                      green: 0.95,
+                      blue: 0.6
+                    }
+                  }
+                })
+              }],
+              fields: 'userEnteredFormat.backgroundColor'
+            }
+          }]
+        }
+      });
+      
+      console.log(`Contact form submission from ${name} (${email}) saved to Google Sheets`);
       
       return res.status(200).json({ 
         message: 'Message sent successfully! We\'ll get back to you soon.'
       });
-    } catch (emailError) {
-      console.error('Error sending contact form email:', emailError);
+    } catch (sheetError) {
+      console.error('Error saving to Google Sheets:', sheetError);
       return res.status(500).json({ 
         message: 'Failed to send message. Please try again later.',
-        error: emailError.message
+        error: sheetError.message
       });
     }
   } catch (error) {
