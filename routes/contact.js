@@ -4,7 +4,7 @@ const { google } = require('googleapis');
 
 // Google Sheets configuration
 const SPREADSHEET_ID = '1MCIpvpJGT6sLuqIENhzQcuOU1fgLmqXb9BHQr5MsMsk';
-const SHEET_NAME = 'Customers support'; // Update this to your sheet name
+const SHEET_NAME = 'Contact'; // Using a simpler sheet name without spaces
 
 // Create client with credentials
 const getGoogleSheetsClient = async () => {
@@ -107,7 +107,7 @@ router.post('/', async (req, res) => {
       // Append data to spreadsheet
       const response = await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
-        range: `'${SHEET_NAME}'!A:E`,
+        range: `${SHEET_NAME}!A:E`,
         valueInputOption: 'USER_ENTERED',
         resource: {
           values: [rowData]
