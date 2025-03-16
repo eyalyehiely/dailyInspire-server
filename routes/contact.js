@@ -107,6 +107,7 @@ router.post('/', async (req, res) => {
       // Append data to spreadsheet
       const response = await sheets.spreadsheets.values.append({
         spreadsheetId: SPREADSHEET_ID,
+        range: `'${SHEET_NAME}'!A:E`,
         valueInputOption: 'USER_ENTERED',
         resource: {
           values: [rowData]
