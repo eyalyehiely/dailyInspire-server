@@ -210,12 +210,8 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ message: 'Password reset link is invalid or has expired' });
     }
     
-    // Hash new password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-    
-    // Update user
-    user.password = hashedPassword;
+    // Set the password directly - mongoose pre-save hook will handle hashing
+    user.password = newPassword;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
