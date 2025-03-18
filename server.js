@@ -21,7 +21,7 @@ connectDB();
 
 // Apply CORS middleware
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'https://dailyinspire.up.railway.app'],
+  origin: ['http://localhost:3000', 'http://localhost:5173', 'https://dailyinspire.up.railway.app','https://app.dailyinspire.xyz'],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
