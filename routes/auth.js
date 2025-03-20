@@ -15,7 +15,7 @@ if (!process.env.JWT_SECRET) {
 router.post('/login', async (req, res) => {
   try {
     // Log request to help debug
-    console.log('Login request received:', JSON.stringify(req.body.email, null, 2));
+    console.log('Login request received:', JSON.stringify(req.body.email));
     
     const { email, password } = req.body;
     
