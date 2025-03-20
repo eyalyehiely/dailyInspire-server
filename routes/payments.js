@@ -311,34 +311,23 @@ router.post('/webhook', async (req, res) => {
   }
 });
 
-// Route to check payment status
+// Route to check user's current payment status
 router.get('/status', auth, async (req, res) => {
   try {
+    console.log('Checking payment status for user:', req.user.id);
+    
     const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
     
-    // Log environment variables for debugging
-    console.log("Payment status - Environment variables:");
-    console.log("CHECKOUT_ID:", process.env.LEMON_SQUEEZY_CHECKOUT_ID);
-    console.log("PRODUCT_ID:", process.env.LEMON_SQUEEZY_PRODUCT_ID);
-    console.log("VARIANT_ID:", process.env.LEMON_SQUEEZY_VARIANT_ID);
-    
-    // Generate direct checkout URL
-    const directCheckoutUrl = generateLemonCheckoutUrl(req.user.id);
-    console.log("Generated checkout URL with user ID:", req.user.id);
-    console.log("Full checkout URL:", directCheckoutUrl);
-    
-    const responseData = {
-      isPaid: user.isPay,
+    return res.json({
+      isPaid: user.isPay || false,
       subscriptionStatus: user.subscriptionStatus || 'none',
-      checkoutId: process.env.LEMON_SQUEEZY_CHECKOUT_ID,
-      productId: process.env.LEMON_SQUEEZY_PRODUCT_ID,
-      variantId: process.env.LEMON_SQUEEZY_VARIANT_ID,
-      userId: req.user.id,
-      directCheckoutUrl
-    };
-    
-    console.log("Sending payment status to client:", responseData);
-    return res.json(responseData);
+      subscriptionId: user.subscriptionId,
+      quotesEnabled: user.quotesEnabled || false,
+      paymentUpdatedAt: user.paymentUpdatedAt
+    });
   } catch (error) {
     console.error('Error checking payment status:', error);
     return res.status(500).json({ message: 'Server error' });
@@ -756,22 +745,24 @@ router.get('/test-update-user/:userId', async (req, res) => {
   }
 });
 
-// Route to log checkout URL attempts
+// Route to log checkout attempts
 router.post('/log-checkout', auth, async (req, res) => {
   try {
-    console.log('===== CHECKOUT URL LOGGED =====');
-    console.log('User ID:', req.user.id);
-    console.log('Checkout URL:', req.body.checkoutUrl);
+    const userId = req.user.id;
+    const { checkoutUrl } = req.body;
     
-    // Update user with last checkout URL attempt
-    await User.findByIdAndUpdate(req.user.id, {
+    console.log(`Logging checkout attempt for user ${userId}`);
+    console.log('Checkout URL:', checkoutUrl);
+    
+    // Update user record with checkout attempt details
+    await User.findByIdAndUpdate(userId, {
       lastCheckoutAttempt: {
-        url: req.body.checkoutUrl,
-        timestamp: new Date()
+        timestamp: new Date(),
+        url: checkoutUrl
       }
     });
     
-    return res.status(200).json({ message: 'Checkout URL logged' });
+    return res.json({ success: true });
   } catch (error) {
     console.error('Error logging checkout:', error);
     return res.status(500).json({ message: 'Server error' });

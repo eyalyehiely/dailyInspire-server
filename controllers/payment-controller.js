@@ -210,12 +210,15 @@ const generateLemonCheckoutUrl = (userId) => {
   // Log the user ID for debugging
   console.log(`Generating checkout URL for user: ${userId}`);
   
+  // Get the application URL from environment or use a default
+  const appUrl = process.env.APP_URL || 'https://app.dailyinspire.xyz';
+  
   // Fixed URL format with proper path structure
   // Format: https://dailyinspire.lemonsqueezy.com/buy/{variant-uuid}?params
   const baseUrl = `https://dailyinspire.lemonsqueezy.com/buy/${variantId}`;
   
-  // Add query parameters with ? separator
-  const fullUrl = `${baseUrl}?checkout[custom][user_id]=${encodeURIComponent(userId || 'unknown')}&discount=0`;
+  // Add query parameters with ? separator, including success and cancel URLs
+  const fullUrl = `${baseUrl}?checkout[custom][user_id]=${encodeURIComponent(userId || 'unknown')}&discount=0&checkout[success_url]=${encodeURIComponent(`${appUrl}/payment-success`)}&checkout[cancel_url]=${encodeURIComponent(`${appUrl}/payment`)}`;
   
   console.log('Generated LemonSqueezy checkout URL:', fullUrl);
   
