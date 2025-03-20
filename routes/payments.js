@@ -27,6 +27,8 @@ router.get('/checkout-info', auth, async (req, res) => {
     
     // Generate direct checkout URL
     const directCheckoutUrl = generateLemonCheckoutUrl(req.user.id);
+    console.log("Generated checkout URL with user ID:", req.user.id);
+    console.log("Full checkout URL:", directCheckoutUrl);
     
     // Return Lemon Squeezy checkout information
     const responseData = {
@@ -196,6 +198,8 @@ router.get('/status', auth, async (req, res) => {
     
     // Generate direct checkout URL
     const directCheckoutUrl = generateLemonCheckoutUrl(req.user.id);
+    console.log("Generated checkout URL with user ID:", req.user.id);
+    console.log("Full checkout URL:", directCheckoutUrl);
     
     const responseData = {
       isPaid: user.isPay,

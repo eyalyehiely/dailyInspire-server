@@ -165,9 +165,12 @@ router.get('/preferences', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
+    console.log("Sending user preferences with ID:", userId);
+    
     res.status(200).json({
       success: true,
       preferences: {
+        _id: user._id,
         email: user.email,
         first_name: user.first_name,
         last_name: user.last_name,
