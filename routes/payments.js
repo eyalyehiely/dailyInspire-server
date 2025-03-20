@@ -25,29 +25,99 @@ router.get('/checkout-info', auth, async (req, res) => {
   }
 });
 
-// Webhook endpoint for LemonSqueezy to notify about successful payments
+// Webhook endpoint for LemonSqueezy to handle all subscription events
 router.post('/webhook', async (req, res) => {
   try {
     const { body } = req;
+    const eventName = body.meta?.event_name;
     
-    // Verify webhook signature (implementation depends on LemonSqueezy's requirements)
-    // This is a simple example - in production you should verify the webhook signature
+    // Log the incoming webhook for debugging
+    console.log(`Received Lemon Squeezy webhook: ${eventName}`);
     
-    // Check if this is a payment success event
-    if (body.meta && body.meta.event_name === 'order_created') {
-      const orderData = body.data;
-      
-      // Extract the user ID from custom data (you'll need to pass this from your checkout page)
-      const userId = orderData.attributes.custom_data?.user_id;
-      
-      if (userId) {
-        // Update user's payment status
-        await User.findByIdAndUpdate(userId, { isPay: true });
-        console.log(`User ${userId} payment status updated to paid`);
-      }
+    // Extract user ID from custom data (ensure this is passed during checkout)
+    let userId;
+    if (body.data?.attributes?.custom_data) {
+      userId = body.data.attributes.custom_data.user_id;
     }
     
-    return res.status(200).json({ received: true });
+    if (!userId) {
+      console.warn('No user ID found in webhook data');
+      return res.status(200).json({ received: true, status: 'No user ID found' });
+    }
+    
+    // Handle different webhook events
+    switch (eventName) {
+      case 'order_created':
+        // When a new order is created
+        console.log(`New order created for user ${userId}`);
+        break;
+        
+      case 'subscription_created':
+        // When a subscription is created
+        await User.findByIdAndUpdate(userId, { 
+          isPay: true,
+          subscriptionId: body.data.id,
+          subscriptionStatus: 'active'
+        });
+        console.log(`Subscription created for user ${userId}`);
+        break;
+        
+      case 'subscription_cancelled':
+        // When a subscription is cancelled but still active until the end of the billing period
+        await User.findByIdAndUpdate(userId, { 
+          subscriptionStatus: 'cancelled'
+        });
+        console.log(`Subscription cancelled for user ${userId}`);
+        break;
+        
+      case 'subscription_expired':
+        // When a subscription has expired after cancellation
+        await User.findByIdAndUpdate(userId, { 
+          isPay: false,
+          subscriptionStatus: 'expired'
+        });
+        console.log(`Subscription expired for user ${userId}`);
+        break;
+        
+      case 'subscription_paused':
+        // When a subscription is paused
+        await User.findByIdAndUpdate(userId, { 
+          subscriptionStatus: 'paused'
+        });
+        console.log(`Subscription paused for user ${userId}`);
+        break;
+        
+      case 'subscription_unpaused':
+        // When a subscription is resumed after being paused
+        await User.findByIdAndUpdate(userId, { 
+          isPay: true,
+          subscriptionStatus: 'active'
+        });
+        console.log(`Subscription unpaused for user ${userId}`);
+        break;
+        
+      case 'subscription_payment_failed':
+        // When a subscription payment fails
+        await User.findByIdAndUpdate(userId, { 
+          subscriptionStatus: 'payment_failed'
+        });
+        console.log(`Subscription payment failed for user ${userId}`);
+        break;
+        
+      case 'subscription_payment_success':
+        // When a subscription payment succeeds
+        await User.findByIdAndUpdate(userId, { 
+          isPay: true,
+          subscriptionStatus: 'active'
+        });
+        console.log(`Subscription payment successful for user ${userId}`);
+        break;
+        
+      default:
+        console.log(`Unhandled webhook event: ${eventName}`);
+    }
+    
+    return res.status(200).json({ received: true, status: 'processed' });
   } catch (error) {
     console.error('Webhook error:', error);
     return res.status(400).json({ message: 'Webhook error' });
@@ -58,7 +128,10 @@ router.post('/webhook', async (req, res) => {
 router.get('/status', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
-    return res.json({ isPaid: user.isPay });
+    return res.json({ 
+      isPaid: user.isPay,
+      subscriptionStatus: user.subscriptionStatus || 'none'
+    });
   } catch (error) {
     console.error('Error checking payment status:', error);
     return res.status(500).json({ message: 'Server error' });

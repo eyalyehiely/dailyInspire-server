@@ -28,6 +28,15 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  subscriptionId: {
+    type: String,
+    default: null
+  },
+  subscriptionStatus: {
+    type: String,
+    enum: ['none', 'active', 'cancelled', 'expired', 'paused', 'payment_failed'],
+    default: 'none'
+  },
   preferredTime: {
     type: String,
     default: "07:00", // Default time (24-hour format)
