@@ -6,7 +6,8 @@ const {
   verifyWebhookSignature, 
   sendReceiptEmail, 
   processSuccessfulPayment,
-  generateLemonCheckoutUrl
+  generateLemonCheckoutUrl,
+  verifySubscriptionStatus
 } = require('../controllers/payment-controller');
 const { sendWelcomeEmail } = require('../controllers/user-controller');
 const mongoose = require('mongoose');
@@ -21,7 +22,12 @@ router.get('/checkout-info', auth, async (req, res) => {
     const user = await User.findById(req.user.id);
     if (user.isPay) {
       console.log('User already has premium access:', req.user.id);
-      return res.json({ isPaid: true, message: 'You already have premium access' });
+      return res.json({ 
+        isPaid: true, 
+        message: 'You already have premium access',
+        subscriptionStatus: user.subscriptionStatus || 'active',
+        subscriptionId: user.subscriptionId || null
+      });
     }
     
     // Log environment variables for debugging
@@ -38,7 +44,9 @@ router.get('/checkout-info', auth, async (req, res) => {
       isPaid: false,
       variantId: process.env.LEMON_SQUEEZY_VARIANT_ID,
       userId: req.user.id,
-      directCheckoutUrl
+      directCheckoutUrl,
+      subscriptionStatus: user.subscriptionStatus || 'none',
+      subscriptionId: user.subscriptionId || null
     };
     
     console.log("Sending checkout info to client:", responseData);
@@ -96,6 +104,9 @@ router.post('/webhook', async (req, res) => {
       body.meta?.custom_data?.userId,
       // Check for checkout URL custom parameters
       body.data?.attributes?.urls?.checkout_url,
+      // Check inside custom_data if it's a stringified JSON
+      body.data?.attributes?.custom_data,
+      body.meta?.custom_data,
     ];
     
     // Try each location
@@ -115,11 +126,62 @@ router.post('/webhook', async (req, res) => {
           } catch (e) {
             console.log('Failed to parse URL:', location);
           }
-        } else {
+        } 
+        // If it's a stringified JSON object, try to parse it
+        else if (typeof location === 'string' && 
+                (location.includes('{') || location.includes('user_id') || location.includes('userId'))) {
+          try {
+            const parsed = JSON.parse(location);
+            if (parsed.user_id) {
+              userId = parsed.user_id;
+              console.log('Extracted user_id from parsed JSON:', userId);
+              break;
+            } else if (parsed.userId) {
+              userId = parsed.userId;
+              console.log('Extracted userId from parsed JSON:', userId);
+              break;
+            }
+          } catch (e) {
+            // Not a valid JSON, check for url-encoded params
+            if (location.includes('user_id=')) {
+              try {
+                const userIdMatch = location.match(/user_id=([^&]+)/);
+                if (userIdMatch && userIdMatch[1]) {
+                  userId = decodeURIComponent(userIdMatch[1]);
+                  console.log('Extracted user_id from string pattern:', userId);
+                  break;
+                }
+              } catch (e) {
+                console.log('Failed to extract user_id from string pattern');
+              }
+            }
+          }
+        }
+        else {
           // Direct value
           userId = location;
           console.log(`Found user_id in webhook data:`, userId);
           break;
+        }
+      }
+    }
+    
+    // Final fallback: deep scan of the entire body for user_id
+    if (!userId) {
+      console.log('No user ID found in standard locations, performing deep search...');
+      const bodyStr = JSON.stringify(body);
+      
+      // Try to find user_id in the stringified body
+      let userIdMatch = bodyStr.match(/"user_id":\s*"([^"]+)"/);
+      if (userIdMatch && userIdMatch[1]) {
+        userId = userIdMatch[1];
+        console.log('Found user_id with deep search:', userId);
+      } else {
+        // Try userId variant
+        userIdMatch = bodyStr.match(/"userId":\s*"([^"]+)"/);
+        if (userIdMatch && userIdMatch[1]) {
+          userId = userIdMatch[1];
+          console.log('Found userId with deep search:', userId);
         }
       }
     }
@@ -713,6 +775,70 @@ router.post('/log-checkout', auth, async (req, res) => {
   } catch (error) {
     console.error('Error logging checkout:', error);
     return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Endpoint to manually check and repair a subscription status
+router.post('/check-subscription', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { subscriptionId } = req.body;
+    
+    console.log(`Manual subscription check requested for user ${userId}`);
+    
+    if (!subscriptionId) {
+      return res.status(400).json({ message: 'Missing subscription ID' });
+    }
+    
+    // Find the user
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    console.log(`Checking subscription ${subscriptionId} for user ${userId}`);
+    
+    // Verify the subscription with LemonSqueezy API
+    const subscriptionData = await verifySubscriptionStatus(subscriptionId);
+    
+    // Update user status based on subscription state
+    if (subscriptionData.isActive) {
+      console.log(`Subscription ${subscriptionId} is active, updating user payment status`);
+      
+      await User.findByIdAndUpdate(userId, {
+        isPay: true,
+        isRegistrationComplete: true,
+        quotesEnabled: true,
+        subscriptionStatus: 'active',
+        subscriptionId: subscriptionId,
+        paymentUpdatedAt: new Date()
+      });
+      
+      return res.json({ 
+        success: true, 
+        message: 'Subscription is active, user status updated',
+        subscriptionStatus: 'active'
+      });
+    } else {
+      console.log(`Subscription ${subscriptionId} is not active (${subscriptionData.status})`);
+      
+      // Update the status to reflect the actual state
+      await User.findByIdAndUpdate(userId, {
+        subscriptionStatus: subscriptionData.status,
+        // Only disable premium features if truly expired/cancelled
+        isPay: !['expired', 'cancelled'].includes(subscriptionData.status),
+        quotesEnabled: !['expired', 'cancelled'].includes(subscriptionData.status)
+      });
+      
+      return res.json({
+        success: true,
+        message: `Subscription status updated to ${subscriptionData.status}`,
+        subscriptionStatus: subscriptionData.status
+      });
+    }
+  } catch (error) {
+    console.error('Error checking subscription:', error);
+    return res.status(500).json({ message: 'Error checking subscription', error: error.message });
   }
 });
 

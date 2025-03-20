@@ -25,7 +25,7 @@ const verifyWebhookSignature = (signature, body) => {
   // Check if webhook secret is configured
   if (!process.env.LEMON_SQUEEZY_WEBHOOK_SECRET) {
     console.error('⚠️ LEMON_SQUEEZY_WEBHOOK_SECRET is not set in environment variables');
-    return false; // Don't accept webhooks without verification - changed from true to false
+    return false;
   }
   
   try {
@@ -37,12 +37,18 @@ const verifyWebhookSignature = (signature, body) => {
     const calculatedSignature = hmac.update(bodyString).digest('hex');
     
     console.log('Calculated signature:', calculatedSignature);
+    console.log('Received signature:', signature);
+    console.log('Secret used (length):', process.env.LEMON_SQUEEZY_WEBHOOK_SECRET?.length || 'missing');
     
-    // Compare signatures
-    const isValid = calculatedSignature === signature;
-    console.log('Signature valid:', isValid);
+    // Try both the calculated signature and a trimmed version in case of whitespace issues
+    const isExactMatch = calculatedSignature === signature;
+    const isTrimmedMatch = calculatedSignature.trim() === signature.trim();
     
-    return isValid; // Return actual verification result
+    console.log('Exact signature match:', isExactMatch);
+    console.log('Trimmed signature match:', isTrimmedMatch);
+    
+    // If either matches, consider it valid
+    return isExactMatch || isTrimmedMatch;
   } catch (error) {
     console.error('Error verifying webhook signature:', error);
     return false; // Reject if there's an error in verification
@@ -73,6 +79,18 @@ const processSuccessfulPayment = async (userId, subscriptionId = null) => {
     
     console.log(`Found user: ${existingUser.email}`);
     
+    // Check if the user is already paid
+    if (existingUser.isPay && existingUser.subscriptionStatus === 'active') {
+      console.log(`User ${userId} already has an active subscription, skipping update`);
+      return existingUser;
+    }
+    
+    // Record the original subscription ID if present for tracking changes
+    const originalSubscriptionId = existingUser.subscriptionId;
+    if (originalSubscriptionId && originalSubscriptionId !== subscriptionId) {
+      console.log(`User ${userId} subscription ID changed from ${originalSubscriptionId} to ${subscriptionId}`);
+    }
+    
     // Update user payment status and complete registration
     const user = await User.findByIdAndUpdate(
       userId,
@@ -80,7 +98,7 @@ const processSuccessfulPayment = async (userId, subscriptionId = null) => {
         isPay: true,
         isRegistrationComplete: true,
         quotesEnabled: true,
-        subscriptionId: subscriptionId || 'unknown',
+        subscriptionId: subscriptionId || existingUser.subscriptionId || 'unknown',
         subscriptionStatus: 'active',
         paymentUpdatedAt: new Date() // Add timestamp for payment update
       },
@@ -204,11 +222,51 @@ const generateLemonCheckoutUrl = (userId) => {
   return fullUrl;
 };
 
+// Verify a subscription status directly with the LemonSqueezy API
+// Use this as a fallback when webhooks fail
+const verifySubscriptionStatus = async (subscriptionId) => {
+  if (!subscriptionId) {
+    throw new Error('Missing subscription ID');
+  }
+  
+  if (!process.env.LEMON_SQUEEZY_API_KEY) {
+    throw new Error('Missing LemonSqueezy API key');
+  }
+  
+  try {
+    console.log(`Verifying subscription status directly with LemonSqueezy API: ${subscriptionId}`);
+    
+    const response = await lemonSqueezyApi.get(`/subscriptions/${subscriptionId}`);
+    
+    if (!response || !response.data || !response.data.data) {
+      throw new Error('Invalid response from LemonSqueezy API');
+    }
+    
+    console.log('LemonSqueezy API response:', JSON.stringify(response.data, null, 2));
+    
+    const subscriptionData = response.data.data;
+    const status = subscriptionData.attributes?.status;
+    
+    console.log(`Subscription ${subscriptionId} status: ${status}`);
+    
+    return {
+      id: subscriptionId,
+      status,
+      isActive: status === 'active',
+      customData: subscriptionData.attributes?.custom_data || {}
+    };
+  } catch (error) {
+    console.error(`Error verifying subscription status with LemonSqueezy API: ${error.message}`);
+    throw error;
+  }
+};
+
 module.exports = {
   lemonSqueezyApi,
   verifyWebhookSignature,
   processSuccessfulPayment,
   sendReceiptEmail,
   getUserPaymentStatus,
-  generateLemonCheckoutUrl
+  generateLemonCheckoutUrl,
+  verifySubscriptionStatus
 }; 
