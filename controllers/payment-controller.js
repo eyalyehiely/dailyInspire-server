@@ -22,15 +22,10 @@ const verifyWebhookSignature = (signature, body) => {
   console.log('Webhook body preview:', bodyPreview);
   console.log('Received signature:', signature);
   
-  // Always return true for webhook testing
-  console.log('⚠️ SIGNATURE VERIFICATION BYPASSED FOR DEBUGGING');
-  return true;
-  
-  // The code below won't execute due to the early return above
-  // Left for reference only
+  // Check if webhook secret is configured
   if (!process.env.LEMON_SQUEEZY_WEBHOOK_SECRET) {
-    console.error('LEMON_SQUEEZY_WEBHOOK_SECRET is not set in environment variables');
-    return true;
+    console.error('⚠️ LEMON_SQUEEZY_WEBHOOK_SECRET is not set in environment variables');
+    return true; // Accept webhooks without verification if secret is not set
   }
   
   try {
@@ -43,14 +38,14 @@ const verifyWebhookSignature = (signature, body) => {
     
     console.log('Calculated signature:', calculatedSignature);
     
-    // Simple string comparison for debugging
+    // Compare signatures
     const isValid = calculatedSignature === signature;
     console.log('Signature valid:', isValid);
     
-    return true; // Always return true for testing
+    return isValid; // Return actual verification result
   } catch (error) {
     console.error('Error verifying webhook signature:', error);
-    return true; // Always return true for testing
+    return false; // Reject if there's an error in verification
   }
 };
 
@@ -189,6 +184,13 @@ const generateLemonCheckoutUrl = (userId) => {
   if (!variantId) {
     throw new Error('Missing variant ID in environment variables');
   }
+  
+  if (!userId) {
+    console.error('WARNING: Missing userId when generating checkout URL');
+  }
+  
+  // Log the user ID for debugging
+  console.log(`Generating checkout URL for user: ${userId}`);
   
   // Fixed URL format with proper path structure
   // Format: https://dailyinspire.lemonsqueezy.com/buy/{variant-uuid}?params
