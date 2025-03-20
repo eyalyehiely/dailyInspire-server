@@ -135,7 +135,8 @@ const getUserPaymentStatus = async (userId) => {
 
 // Generate a direct checkout URL for LemonSqueezy
 const generateLemonCheckoutUrl = (userId) => {
-  const storeName = 'dailyinspire';
+  // Use environment variable for store name or fall back to 'dailyinspire'
+  const storeName = process.env.LEMON_SQUEEZY_STORE_NAME || 'dailyinspire';
   const productId = process.env.LEMON_SQUEEZY_PRODUCT_ID;
   const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID;
   
@@ -143,7 +144,20 @@ const generateLemonCheckoutUrl = (userId) => {
     throw new Error('Missing product or variant ID in environment variables');
   }
   
-  return `https://${storeName}.lemonsqueezy.com/checkout/buy/${productId}?variant=${variantId}&checkout[custom][user_id]=${userId || 'unknown'}`;
+  // Use LemonSqueezy's standard checkout URL format
+  // Format 1: https://[store].lemonsqueezy.com/checkout/buy/[product]?variant=[variant]
+  const checkoutUrl1 = `https://${storeName}.lemonsqueezy.com/checkout/buy/${productId}?variant=${variantId}&checkout[custom][user_id]=${userId || 'unknown'}`;
+  
+  // Format 2: https://checkout.lemonsqueezy.com/buy/[variant]?media=0
+  const checkoutUrl2 = `https://checkout.lemonsqueezy.com/buy/${variantId}?checkout[custom][user_id]=${userId || 'unknown'}`;
+  
+  // Log both formats for debugging
+  console.log('Generated LemonSqueezy checkout URLs:');
+  console.log('Format 1:', checkoutUrl1);
+  console.log('Format 2:', checkoutUrl2);
+  
+  // Use the second format which is more reliable
+  return checkoutUrl2;
 };
 
 module.exports = {
