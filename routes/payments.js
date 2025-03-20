@@ -564,4 +564,58 @@ router.post('/admin/force-upgrade', async (req, res) => {
   }
 });
 
+// Super simple raw webhook log endpoint - logs everything and returns 200
+router.post('/raw-webhook-log', async (req, res) => {
+  try {
+    console.log('==== RAW WEBHOOK RECEIVED ====');
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+    console.log('Query:', JSON.stringify(req.query, null, 2));
+    
+    // Create logs directory if it doesn't exist
+    const fs = require('fs');
+    const path = require('path');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const logDir = path.join(__dirname, '../logs');
+    
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    
+    // Log to file
+    const logFile = path.join(logDir, `raw-webhook-${timestamp}.json`);
+    fs.writeFileSync(logFile, JSON.stringify({
+      timestamp,
+      headers: req.headers,
+      body: req.body,
+      query: req.query
+    }, null, 2));
+    
+    console.log(`Raw webhook logged to: ${logFile}`);
+    
+    // Extract user ID from various possible locations
+    let userId = null;
+    const body = req.body;
+    
+    if (body?.data?.attributes?.custom_data?.user_id) {
+      userId = body.data.attributes.custom_data.user_id;
+    } else if (body?.meta?.custom_data?.user_id) {
+      userId = body.meta.custom_data.user_id;
+    } else if (body?.data?.attributes?.first_order_item?.custom_data?.user_id) {
+      userId = body.data.attributes.first_order_item.custom_data.user_id;
+    }
+    
+    // Return success
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Webhook logged',
+      extractedUserId: userId
+    });
+  } catch (error) {
+    console.error('Raw webhook log error:', error);
+    // Always return 200 to prevent retries
+    return res.status(200).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router; 
