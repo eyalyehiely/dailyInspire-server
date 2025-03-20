@@ -133,10 +133,24 @@ const getUserPaymentStatus = async (userId) => {
   }
 };
 
+// Generate a direct checkout URL for LemonSqueezy
+const generateLemonCheckoutUrl = (userId) => {
+  const storeName = 'dailyinspire';
+  const productId = process.env.LEMON_SQUEEZY_PRODUCT_ID;
+  const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID;
+  
+  if (!productId || !variantId) {
+    throw new Error('Missing product or variant ID in environment variables');
+  }
+  
+  return `https://${storeName}.lemonsqueezy.com/checkout/buy/${productId}?variant=${variantId}&checkout[custom][user_id]=${userId || 'unknown'}`;
+};
+
 module.exports = {
   lemonSqueezyApi,
   verifyWebhookSignature,
   processSuccessfulPayment,
   sendReceiptEmail,
-  getUserPaymentStatus
+  getUserPaymentStatus,
+  generateLemonCheckoutUrl
 }; 

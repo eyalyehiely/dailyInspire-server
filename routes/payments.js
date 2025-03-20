@@ -5,7 +5,8 @@ const User = require('../models/User');
 const { 
   verifyWebhookSignature, 
   sendReceiptEmail, 
-  processSuccessfulPayment 
+  processSuccessfulPayment,
+  generateLemonCheckoutUrl
 } = require('../controllers/payment-controller');
 const { sendWelcomeEmail } = require('../controllers/user-controller');
 
@@ -24,15 +25,17 @@ router.get('/checkout-info', auth, async (req, res) => {
     console.log("PRODUCT_ID:", process.env.LEMON_SQUEEZY_PRODUCT_ID);
     console.log("VARIANT_ID:", process.env.LEMON_SQUEEZY_VARIANT_ID);
     
+    // Generate direct checkout URL
+    const directCheckoutUrl = generateLemonCheckoutUrl(req.user.id);
+    
     // Return Lemon Squeezy checkout information
-    // - For overlay checkout use checkoutId (preferred method)
-    // - For redirect checkout use checkoutUrl
     const responseData = {
       isPaid: false,
       checkoutId: process.env.LEMON_SQUEEZY_CHECKOUT_ID,
       productId: process.env.LEMON_SQUEEZY_PRODUCT_ID,
       variantId: process.env.LEMON_SQUEEZY_VARIANT_ID,
-      userId: req.user.id
+      userId: req.user.id,
+      directCheckoutUrl
     };
     
     console.log("Sending checkout info to client:", responseData);
@@ -191,19 +194,40 @@ router.get('/status', auth, async (req, res) => {
     console.log("PRODUCT_ID:", process.env.LEMON_SQUEEZY_PRODUCT_ID);
     console.log("VARIANT_ID:", process.env.LEMON_SQUEEZY_VARIANT_ID);
     
+    // Generate direct checkout URL
+    const directCheckoutUrl = generateLemonCheckoutUrl(req.user.id);
+    
     const responseData = {
       isPaid: user.isPay,
       subscriptionStatus: user.subscriptionStatus || 'none',
       checkoutId: process.env.LEMON_SQUEEZY_CHECKOUT_ID,
       productId: process.env.LEMON_SQUEEZY_PRODUCT_ID,
       variantId: process.env.LEMON_SQUEEZY_VARIANT_ID,
-      userId: req.user.id
+      userId: req.user.id,
+      directCheckoutUrl
     };
     
     console.log("Sending payment status to client:", responseData);
     return res.json(responseData);
   } catch (error) {
     console.error('Error checking payment status:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Route for testing lemon squeezy configuration
+router.get('/test-lemon-config', async (req, res) => {
+  try {
+    return res.json({
+      message: 'Lemon Squeezy configuration',
+      store: 'dailyinspire',
+      checkoutId: process.env.LEMON_SQUEEZY_CHECKOUT_ID,
+      productId: process.env.LEMON_SQUEEZY_PRODUCT_ID,
+      variantId: process.env.LEMON_SQUEEZY_VARIANT_ID,
+      checkoutUrl: `https://dailyinspire.lemonsqueezy.com/checkout/buy/${process.env.LEMON_SQUEEZY_PRODUCT_ID}?variant=${process.env.LEMON_SQUEEZY_VARIANT_ID}`
+    });
+  } catch (error) {
+    console.error('Error in test endpoint:', error);
     return res.status(500).json({ message: 'Server error' });
   }
 });
