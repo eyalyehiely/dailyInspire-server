@@ -251,4 +251,43 @@ router.put('/preferences', auth, async (req, res) => {
   }
 });
 
+// Add a token verification endpoint
+router.get('/verify', auth, async (req, res) => {
+  try {
+    // Get user from database to ensure we have the most up-to-date data
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({ isValid: false, message: 'User not found' });
+    }
+    
+    // Check if registration is complete
+    if (!user.isRegistrationComplete) {
+      return res.status(403).json({
+        isValid: true,
+        registrationStatus: 'incomplete',
+        message: 'Registration incomplete. Please complete payment to activate your account.',
+        nextStep: 'payment'
+      });
+    }
+    
+    // Token is valid and registration is complete
+    return res.json({
+      isValid: true,
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        isRegistrationComplete: user.isRegistrationComplete,
+        isPaid: user.isPay,
+        subscriptionStatus: user.subscriptionStatus || 'none'
+      }
+    });
+  } catch (error) {
+    console.error('Error verifying token:', error);
+    return res.status(500).json({ isValid: false, message: 'Server error' });
+  }
+});
+
 module.exports = router; 

@@ -61,14 +61,16 @@ router.post('/signup', async (req, res) => {
     }
     let timezone=timeZone
     
-    // Create a new user with all required fields
+    // Create a new user with all required fields and mark registration as incomplete
     const user = new User({
       email,
       first_name,
       last_name,
       preferredTime,
       timezone,
-      password // Make sure to include the password
+      password, // Make sure to include the password
+      isRegistrationComplete: false, // Mark registration as incomplete until subscription
+      quotesEnabled: false // Disable quotes until subscription is complete
     });
     
     console.log('Saving user with preferredTime:', preferredTime);
@@ -82,22 +84,18 @@ router.post('/signup', async (req, res) => {
       { expiresIn: '1d' }
     );
 
-    // Send welcome email without referencing any quote variable
-    try {
-      await sendWelcomeEmail(user);
-      console.log('Welcome email sent successfully');
-    } catch (err) {
-      console.error('Failed to send welcome email, but user was created:', err);
-    }
+    // Don't send welcome email until subscription is complete
+    // We'll send it when the subscription_created webhook is received
     
     res.status(201).json({
-      message: 'User created successfully',
+      message: 'User created successfully. Please complete subscription to activate your account.',
       token,
       user: {
         id: user._id,
         email: user.email,
         first_name: user.first_name,
-        last_name: user.last_name
+        last_name: user.last_name,
+        isRegistrationComplete: false
       }
     });
   } catch (error) {

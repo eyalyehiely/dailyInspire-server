@@ -28,6 +28,10 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isRegistrationComplete: {
+    type: Boolean,
+    default: false
+  },
   subscriptionId: {
     type: String,
     default: null

@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const paymentRoutes = require('./routes/payments');
 const connectDB = require('./config/db');
 const auth = require('./middleware/auth');
+const completeRegistration = require('./middleware/completeRegistration');
 const passwordResetRoutes = require('./routes/password-reset');
 const contactRoutes = require('./routes/contact');
 
@@ -35,14 +36,17 @@ app.use((req, res, next) => {
   next();
 });
 
+// Payment routes don't require complete registration since they're used to complete it
+app.use('/api/payments', paymentRoutes);
+
+// Routes that don't require full authentication
 app.use('/api/quotes', quoteRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/payments', paymentRoutes);
 app.use('/api', passwordResetRoutes);
 app.use('/api/contact', contactRoutes);
 
-// Protected route example
-app.get('/api/profile', auth, (req, res) => {
+// Protected route example - requires both authentication and complete registration
+app.get('/api/profile', auth, completeRegistration, (req, res) => {
   res.json({ user: req.user });
 }); 
 

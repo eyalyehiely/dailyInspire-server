@@ -3,6 +3,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
 const axios = require('axios');
+const { sendWelcomeEmail } = require('../controllers/user-controller');
 
 // Route to get payment page information
 router.get('/checkout-info', auth, async (req, res) => {
@@ -53,13 +54,33 @@ router.post('/webhook', async (req, res) => {
         break;
         
       case 'subscription_created':
-        // When a subscription is created
+        // When a subscription is created - complete the registration process
+        const user = await User.findById(userId);
+        
+        if (!user) {
+          console.warn(`User ${userId} not found when processing subscription_created`);
+          break;
+        }
+        
+        // Complete registration and activate user
         await User.findByIdAndUpdate(userId, { 
           isPay: true,
           subscriptionId: body.data.id,
-          subscriptionStatus: 'active'
+          subscriptionStatus: 'active',
+          isRegistrationComplete: true, // Mark registration as complete
+          quotesEnabled: true // Enable quotes now that registration is complete
         });
-        console.log(`Subscription created for user ${userId}`);
+        
+        // Send welcome email now that subscription is complete
+        try {
+          const updatedUser = await User.findById(userId);
+          await sendWelcomeEmail(updatedUser);
+          console.log(`Welcome email sent to user ${userId} after subscription completion`);
+        } catch (err) {
+          console.error(`Failed to send welcome email to user ${userId}:`, err);
+        }
+        
+        console.log(`Subscription created for user ${userId}, registration completed`);
         break;
         
       case 'subscription_cancelled':
