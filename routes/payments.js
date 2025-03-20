@@ -9,6 +9,7 @@ const {
   generateLemonCheckoutUrl
 } = require('../controllers/payment-controller');
 const { sendWelcomeEmail } = require('../controllers/user-controller');
+const mongoose = require('mongoose');
 
 // Route to get payment page information
 router.get('/checkout-info', auth, async (req, res) => {
@@ -112,7 +113,6 @@ router.post('/webhook', async (req, res) => {
     }
     
     // Validate the user ID is a valid MongoDB ID
-    const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       console.warn(`Received invalid user ID format: ${userId}`);
       return res.status(200).json({ received: true, status: 'Invalid user ID format' });
@@ -324,6 +324,8 @@ router.get('/debug-checkout', async (req, res) => {
 // Raw webhook debug endpoint - logs all incoming webhook data without verification
 router.post('/webhook-debug', async (req, res) => {
   try {
+    console.log('===== WEBHOOK DEBUG ENDPOINT TRIGGERED =====');
+    
     const fs = require('fs');
     const path = require('path');
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -334,24 +336,80 @@ router.post('/webhook-debug', async (req, res) => {
       fs.mkdirSync(logDir, { recursive: true });
     }
     
+    // Extract any potential user IDs from the data for easier debugging
+    let possibleUserIds = [];
+    const body = req.body;
+    
+    // Look in common places for user IDs
+    if (body?.data?.attributes?.custom_data?.user_id) {
+      possibleUserIds.push(body.data.attributes.custom_data.user_id);
+    }
+    if (body?.meta?.custom_data?.user_id) {
+      possibleUserIds.push(body.meta.custom_data.user_id);
+    }
+    if (req.query.user_id) {
+      possibleUserIds.push(req.query.user_id);
+    }
+    
     // Log the raw headers and body
     const logData = {
       timestamp: new Date().toISOString(),
+      possibleUserIds,
       headers: req.headers,
       body: req.body,
       query: req.query
     };
     
     // Write to file
-    const logPath = path.join(logDir, `webhook-${timestamp}.json`);
+    const logPath = path.join(logDir, `webhook-debug-${timestamp}.json`);
     fs.writeFileSync(logPath, JSON.stringify(logData, null, 2));
     
     console.log(`Webhook debug data saved to ${logPath}`);
+    console.log('Possible User IDs:', possibleUserIds);
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
     console.log('Body:', JSON.stringify(req.body, null, 2));
     
+    // Try to process this webhook data through the normal webhook handler logic
+    if (body.meta?.event_name && possibleUserIds.length > 0) {
+      console.log('Attempting to process webhook data...');
+      
+      // Try each user ID until one works
+      for (const userId of possibleUserIds) {
+        try {
+          if (!mongoose.Types.ObjectId.isValid(userId)) {
+            console.log(`Invalid user ID format: ${userId}, skipping`);
+            continue;
+          }
+          
+          const user = await User.findById(userId);
+          if (!user) {
+            console.log(`User not found with ID: ${userId}, skipping`);
+            continue;
+          }
+          
+          console.log(`Found user: ${user.email} with ID: ${userId}`);
+          
+          // Process the webhook based on event type
+          const eventName = body.meta.event_name;
+          
+          if (eventName === 'subscription_created' || eventName === 'order_created') {
+            const updatedUser = await processSuccessfulPayment(userId, body.data?.id || 'debug-webhook');
+            console.log(`Successfully processed payment for user: ${updatedUser.email}`);
+          }
+          
+          break; // Exit loop once a valid user is processed
+        } catch (err) {
+          console.error(`Error processing user ${userId}:`, err);
+        }
+      }
+    }
+    
     // Always respond with success
-    return res.status(200).json({ received: true, status: 'debug_logged' });
+    return res.status(200).json({ 
+      received: true, 
+      status: 'debug_logged',
+      possibleUserIds
+    });
   } catch (error) {
     console.error('Webhook debug error:', error);
     return res.status(200).json({ received: true, error: error.message }); // Still return 200 to avoid retries
@@ -420,6 +478,88 @@ router.post('/simulate-webhook', async (req, res) => {
     });
   } catch (error) {
     console.error('Simulation error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Debug endpoint to check a user's payment status (for admin debugging only)
+router.get('/debug-user-status', async (req, res) => {
+  try {
+    const { email, userId } = req.query;
+    
+    if (!email && !userId) {
+      return res.status(400).json({ error: 'Please provide either email or userId query parameter' });
+    }
+    
+    let user;
+    
+    if (email) {
+      user = await User.findOne({ email });
+    } else if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      user = await User.findById(userId);
+    }
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Return user payment information
+    return res.json({
+      id: user._id.toString(),
+      email: user.email,
+      name: `${user.first_name} ${user.last_name}`,
+      isPay: user.isPay,
+      isRegistrationComplete: user.isRegistrationComplete,
+      quotesEnabled: user.quotesEnabled,
+      subscriptionStatus: user.subscriptionStatus || 'none',
+      subscriptionId: user.subscriptionId || 'none',
+      paymentUpdatedAt: user.paymentUpdatedAt || 'never'
+    });
+  } catch (error) {
+    console.error('Error in debug-user-status endpoint:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin endpoint to manually upgrade a user (should be behind admin auth in production)
+router.post('/admin/force-upgrade', async (req, res) => {
+  try {
+    const { email, userId } = req.body;
+    
+    if (!email && !userId) {
+      return res.status(400).json({ error: 'Please provide either email or userId in the request body' });
+    }
+    
+    let user;
+    
+    if (email) {
+      user = await User.findOne({ email });
+    } else if (userId && mongoose.Types.ObjectId.isValid(userId)) {
+      user = await User.findById(userId);
+    }
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Process the upgrade
+    const subscriptionId = `admin-upgrade-${Date.now()}`;
+    const updatedUser = await processSuccessfulPayment(user._id.toString(), subscriptionId);
+    
+    // Return upgraded user information
+    return res.json({
+      success: true,
+      message: `User ${updatedUser.email} has been upgraded to paid status`,
+      user: {
+        id: updatedUser._id.toString(),
+        email: updatedUser.email,
+        name: `${updatedUser.first_name} ${updatedUser.last_name}`,
+        isPay: updatedUser.isPay,
+        subscriptionStatus: updatedUser.subscriptionStatus
+      }
+    });
+  } catch (error) {
+    console.error('Error in force-upgrade endpoint:', error);
     return res.status(500).json({ error: error.message });
   }
 });
