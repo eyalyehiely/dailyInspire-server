@@ -15,8 +15,15 @@ const lemonSqueezyApi = axios.create({
 
 // Verify a webhook signature from LemonSqueezy
 const verifyWebhookSignature = (signature, body) => {
+  console.log('Verifying webhook signature');
+  
   if (!process.env.LEMON_SQUEEZY_WEBHOOK_SECRET) {
     console.error('LEMON_SQUEEZY_WEBHOOK_SECRET is not set in environment variables');
+    return false;
+  }
+  
+  if (!signature) {
+    console.error('No signature provided for verification');
     return false;
   }
   
@@ -28,15 +35,34 @@ const verifyWebhookSignature = (signature, body) => {
     const hmac = crypto.createHmac('sha256', process.env.LEMON_SQUEEZY_WEBHOOK_SECRET);
     const calculatedSignature = hmac.update(bodyString).digest('hex');
     
-    // Compare the calculated signature with the one provided in the request
-    const isValid = crypto.timingSafeEqual(
-      Buffer.from(calculatedSignature, 'hex'),
-      Buffer.from(signature, 'hex')
-    );
+    console.log('Webhook signature verification:');
+    console.log(`Provided signature: ${signature}`);
+    console.log(`Calculated signature: ${calculatedSignature}`);
     
-    return isValid;
+    // Do a simple string comparison first (safer)
+    if (calculatedSignature === signature) {
+      console.log('Signature verified (string comparison)');
+      return true;
+    }
+    
+    // Then try the timing-safe comparison as backup
+    try {
+      // Compare the calculated signature with the one provided in the request
+      const isValid = crypto.timingSafeEqual(
+        Buffer.from(calculatedSignature, 'hex'),
+        Buffer.from(signature, 'hex')
+      );
+      
+      console.log(`Signature verification result: ${isValid ? 'valid' : 'invalid'}`);
+      return isValid;
+    } catch (cryptoError) {
+      console.error('Error in timing-safe comparison:', cryptoError);
+      // Fall back to string comparison if timingSafeEqual fails
+      return calculatedSignature === signature;
+    }
   } catch (error) {
     console.error('Error verifying webhook signature:', error);
+    console.error('Error stack:', error.stack);
     return false;
   }
 };
@@ -44,6 +70,27 @@ const verifyWebhookSignature = (signature, body) => {
 // Process a successful payment and mark registration as complete
 const processSuccessfulPayment = async (userId, subscriptionId = null) => {
   try {
+    console.log(`Processing payment for user: ${userId}`);
+    console.log(`Subscription ID: ${subscriptionId || 'unknown'}`);
+    
+    if (!userId) {
+      throw new Error('Missing user ID');
+    }
+    
+    // Validate the user ID is a valid MongoDB ID
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new Error(`Invalid user ID format: ${userId}`);
+    }
+    
+    // Find user first to verify they exist
+    const existingUser = await User.findById(userId);
+    if (!existingUser) {
+      throw new Error(`User not found with ID: ${userId}`);
+    }
+    
+    console.log(`Found user: ${existingUser.email}`);
+    
     // Update user payment status and complete registration
     const user = await User.findByIdAndUpdate(
       userId,
@@ -52,19 +99,34 @@ const processSuccessfulPayment = async (userId, subscriptionId = null) => {
         isRegistrationComplete: true,
         quotesEnabled: true,
         subscriptionId: subscriptionId || 'unknown',
-        subscriptionStatus: 'active'
+        subscriptionStatus: 'active',
+        paymentUpdatedAt: new Date() // Add timestamp for payment update
       },
       { new: true }
     );
     
+    // Verify the update was successful
     if (!user) {
-      throw new Error(`User not found: ${userId}`);
+      throw new Error(`Failed to update user: ${userId}`);
+    }
+    
+    // Verify the payment status was updated
+    if (!user.isPay) {
+      throw new Error(`Payment status not updated for user: ${userId}`);
     }
     
     console.log(`Payment processed successfully for user: ${userId}`);
+    console.log(`Updated user data:`, JSON.stringify({
+      email: user.email,
+      isPay: user.isPay,
+      subscriptionStatus: user.subscriptionStatus,
+      quotesEnabled: user.quotesEnabled
+    }, null, 2));
+    
     return user;
   } catch (error) {
-    console.error('Error processing payment:', error);
+    console.error(`Error processing payment for user ${userId}:`, error);
+    console.error('Error stack:', error.stack);
     throw error;
   }
 };

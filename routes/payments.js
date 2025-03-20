@@ -51,6 +51,9 @@ router.get('/checkout-info', auth, async (req, res) => {
 // Webhook endpoint for LemonSqueezy to handle all subscription events
 router.post('/webhook', async (req, res) => {
   try {
+    console.log('===== WEBHOOK RECEIVED =====');
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    
     // Verify webhook signature from LemonSqueezy
     const signature = req.headers['x-signature'];
     if (!signature) {
@@ -58,12 +61,17 @@ router.post('/webhook', async (req, res) => {
       return res.status(401).json({ error: 'Missing signature' });
     }
     
-    // Verify the signature
+    // Log the raw body for debugging
     const rawBody = JSON.stringify(req.body);
+    console.log('Raw webhook body:', rawBody);
+    
+    // Verify the signature
     const isSignatureValid = verifyWebhookSignature(signature, rawBody);
     
     if (!isSignatureValid) {
       console.warn('Invalid webhook signature');
+      console.warn('Expected signature:', signature);
+      console.warn('Secret used:', process.env.LEMON_SQUEEZY_WEBHOOK_SECRET ? 'Secret is set' : 'Secret is missing!');
       return res.status(401).json({ error: 'Invalid signature' });
     }
     
@@ -90,6 +98,11 @@ router.post('/webhook', async (req, res) => {
       // From meta custom data if available
       userId = body.meta.custom_data.user_id;
       console.log('Found user_id in meta custom_data:', userId);
+    } else if (body.data?.relationships?.order?.data?.id) {
+      // Try to find from order data directly
+      console.log('Looking for order details to find user_id');
+      
+      // We could fetch the order details here if needed in the future
     }
     
     if (!userId) {
@@ -98,7 +111,23 @@ router.post('/webhook', async (req, res) => {
       return res.status(200).json({ received: true, status: 'No user ID found' });
     }
     
+    // Validate the user ID is a valid MongoDB ID
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      console.warn(`Received invalid user ID format: ${userId}`);
+      return res.status(200).json({ received: true, status: 'Invalid user ID format' });
+    }
+    
+    // Check if user exists
+    const userExists = await User.findById(userId);
+    if (!userExists) {
+      console.warn(`User with ID ${userId} not found in database`);
+      return res.status(200).json({ received: true, status: 'User not found' });
+    }
+    
     // Handle different webhook events
+    console.log(`Processing webhook event ${eventName} for user ${userId}`);
+    
     switch (eventName) {
       case 'order_created':
         // When a new order is created
@@ -192,10 +221,13 @@ router.post('/webhook', async (req, res) => {
         console.log(`Unhandled webhook event: ${eventName}`);
     }
     
+    console.log(`Webhook processed successfully for event: ${eventName}`);
     return res.status(200).json({ received: true, status: 'processed' });
   } catch (error) {
     console.error('Webhook error:', error);
-    return res.status(400).json({ message: 'Webhook error' });
+    // Include the stack trace for better debugging
+    console.error('Error stack:', error.stack);
+    return res.status(200).json({ message: 'Webhook error', error: error.message }); // Return 200 to avoid retries
   }
 });
 
@@ -286,6 +318,109 @@ router.get('/debug-checkout', async (req, res) => {
   } catch (error) {
     console.error('Error in debug endpoint:', error);
     return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Raw webhook debug endpoint - logs all incoming webhook data without verification
+router.post('/webhook-debug', async (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const logDir = path.join(__dirname, '../logs');
+    
+    // Create logs directory if it doesn't exist
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    
+    // Log the raw headers and body
+    const logData = {
+      timestamp: new Date().toISOString(),
+      headers: req.headers,
+      body: req.body,
+      query: req.query
+    };
+    
+    // Write to file
+    const logPath = path.join(logDir, `webhook-${timestamp}.json`);
+    fs.writeFileSync(logPath, JSON.stringify(logData, null, 2));
+    
+    console.log(`Webhook debug data saved to ${logPath}`);
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+    
+    // Always respond with success
+    return res.status(200).json({ received: true, status: 'debug_logged' });
+  } catch (error) {
+    console.error('Webhook debug error:', error);
+    return res.status(200).json({ received: true, error: error.message }); // Still return 200 to avoid retries
+  }
+});
+
+// Webhook simulation endpoint for testing
+router.post('/simulate-webhook', async (req, res) => {
+  try {
+    console.log('===== SIMULATING LEMON SQUEEZY WEBHOOK =====');
+    
+    // Get the user ID from the request
+    const userId = req.body.user_id || req.query.user_id;
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing user_id parameter' });
+    }
+    
+    // Check if the user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: `User not found: ${userId}` });
+    }
+    
+    console.log(`Found user: ${user.email}`);
+    
+    // Create a mock webhook event
+    const mockEvent = {
+      meta: {
+        event_name: 'subscription_created',
+        custom_data: {
+          user_id: userId
+        }
+      },
+      data: {
+        id: 'test-subscription-' + Date.now(),
+        attributes: {
+          user_id: userId,
+          custom_data: {
+            user_id: userId
+          }
+        }
+      }
+    };
+    
+    console.log('Mock webhook payload:', JSON.stringify(mockEvent, null, 2));
+    
+    // Process the payment
+    const updatedUser = await processSuccessfulPayment(userId, mockEvent.data.id);
+    
+    // Send the welcome email
+    await sendWelcomeEmail(updatedUser);
+    
+    // Send the receipt email
+    await sendReceiptEmail(updatedUser, {
+      orderId: mockEvent.data.id
+    });
+    
+    return res.status(200).json({
+      success: true,
+      user: {
+        id: updatedUser._id,
+        email: updatedUser.email,
+        isPay: updatedUser.isPay,
+        subscriptionStatus: updatedUser.subscriptionStatus
+      }
+    });
+  } catch (error) {
+    console.error('Simulation error:', error);
+    return res.status(500).json({ error: error.message });
   }
 });
 

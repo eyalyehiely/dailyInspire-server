@@ -30,6 +30,10 @@ app.use(cors({
   credentials: true
 }));
 
+// Add webhook logger middleware
+const webhookLogger = require('./middleware/webhook-logger');
+app.use(webhookLogger);
+
 // Add this before your routes
 app.use((req, res, next) => {
   if (req.path.includes('/api/auth/login')) {
