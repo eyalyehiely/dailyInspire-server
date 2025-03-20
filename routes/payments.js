@@ -18,16 +18,25 @@ router.get('/checkout-info', auth, async (req, res) => {
       return res.json({ isPaid: true, message: 'You already have premium access' });
     }
     
+    // Log environment variables for debugging
+    console.log("Payment checkout info - Environment variables:");
+    console.log("CHECKOUT_ID:", process.env.LEMON_SQUEEZY_CHECKOUT_ID);
+    console.log("PRODUCT_ID:", process.env.LEMON_SQUEEZY_PRODUCT_ID);
+    console.log("VARIANT_ID:", process.env.LEMON_SQUEEZY_VARIANT_ID);
+    
     // Return Lemon Squeezy checkout information
     // - For overlay checkout use checkoutId (preferred method)
     // - For redirect checkout use checkoutUrl
-    return res.json({
+    const responseData = {
       isPaid: false,
       checkoutId: process.env.LEMON_SQUEEZY_CHECKOUT_ID,
       productId: process.env.LEMON_SQUEEZY_PRODUCT_ID,
       variantId: process.env.LEMON_SQUEEZY_VARIANT_ID,
       userId: req.user.id
-    });
+    };
+    
+    console.log("Sending checkout info to client:", responseData);
+    return res.json(responseData);
   } catch (error) {
     console.error('Error getting checkout info:', error);
     return res.status(500).json({ message: 'Server error' });
@@ -175,14 +184,24 @@ router.post('/webhook', async (req, res) => {
 router.get('/status', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
-    return res.json({ 
+    
+    // Log environment variables for debugging
+    console.log("Payment status - Environment variables:");
+    console.log("CHECKOUT_ID:", process.env.LEMON_SQUEEZY_CHECKOUT_ID);
+    console.log("PRODUCT_ID:", process.env.LEMON_SQUEEZY_PRODUCT_ID);
+    console.log("VARIANT_ID:", process.env.LEMON_SQUEEZY_VARIANT_ID);
+    
+    const responseData = {
       isPaid: user.isPay,
       subscriptionStatus: user.subscriptionStatus || 'none',
       checkoutId: process.env.LEMON_SQUEEZY_CHECKOUT_ID,
       productId: process.env.LEMON_SQUEEZY_PRODUCT_ID,
       variantId: process.env.LEMON_SQUEEZY_VARIANT_ID,
       userId: req.user.id
-    });
+    };
+    
+    console.log("Sending payment status to client:", responseData);
+    return res.json(responseData);
   } catch (error) {
     console.error('Error checking payment status:', error);
     return res.status(500).json({ message: 'Server error' });
