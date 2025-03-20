@@ -2,7 +2,11 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
-const axios = require('axios');
+const { 
+  verifyWebhookSignature, 
+  sendReceiptEmail, 
+  processSuccessfulPayment 
+} = require('../controllers/payment-controller');
 const { sendWelcomeEmail } = require('../controllers/user-controller');
 
 // Route to get payment page information
@@ -20,6 +24,8 @@ router.get('/checkout-info', auth, async (req, res) => {
     return res.json({
       isPaid: false,
       checkoutId: process.env.LEMON_SQUEEZY_CHECKOUT_ID,
+      productId: process.env.LEMON_SQUEEZY_PRODUCT_ID,
+      variantId: process.env.LEMON_SQUEEZY_VARIANT_ID,
       userId: req.user.id
     });
   } catch (error) {
@@ -31,6 +37,22 @@ router.get('/checkout-info', auth, async (req, res) => {
 // Webhook endpoint for LemonSqueezy to handle all subscription events
 router.post('/webhook', async (req, res) => {
   try {
+    // Verify webhook signature from LemonSqueezy
+    const signature = req.headers['x-signature'];
+    if (!signature) {
+      console.warn('Missing webhook signature');
+      return res.status(401).json({ error: 'Missing signature' });
+    }
+    
+    // Verify the signature
+    const rawBody = JSON.stringify(req.body);
+    const isSignatureValid = verifyWebhookSignature(signature, rawBody);
+    
+    if (!isSignatureValid) {
+      console.warn('Invalid webhook signature');
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+    
     const { body } = req;
     const eventName = body.meta?.event_name;
     
@@ -57,32 +79,22 @@ router.post('/webhook', async (req, res) => {
         
       case 'subscription_created':
         // When a subscription is created - complete the registration process
-        const user = await User.findById(userId);
-        
-        if (!user) {
-          console.warn(`User ${userId} not found when processing subscription_created`);
-          break;
-        }
-        
-        // Complete registration and activate user
-        await User.findByIdAndUpdate(userId, { 
-          isPay: true,
-          subscriptionId: body.data.id,
-          subscriptionStatus: 'active',
-          isRegistrationComplete: true, // Mark registration as complete
-          quotesEnabled: true // Enable quotes now that registration is complete
-        });
-        
-        // Send welcome email now that subscription is complete
         try {
-          const updatedUser = await User.findById(userId);
-          await sendWelcomeEmail(updatedUser);
-          console.log(`Welcome email sent to user ${userId} after subscription completion`);
+          // Update user record
+          const user = await processSuccessfulPayment(userId, body.data.id);
+          
+          // Send welcome email now that subscription is complete
+          await sendWelcomeEmail(user);
+          
+          // Send receipt email
+          await sendReceiptEmail(user, {
+            orderId: body.data.attributes.order_id || body.data.id
+          });
+          
+          console.log(`Subscription created for user ${userId}, registration completed`);
         } catch (err) {
-          console.error(`Failed to send welcome email to user ${userId}:`, err);
+          console.error(`Error processing subscription for user ${userId}:`, err);
         }
-        
-        console.log(`Subscription created for user ${userId}, registration completed`);
         break;
         
       case 'subscription_cancelled':
@@ -97,7 +109,8 @@ router.post('/webhook', async (req, res) => {
         // When a subscription has expired after cancellation
         await User.findByIdAndUpdate(userId, { 
           isPay: false,
-          subscriptionStatus: 'expired'
+          subscriptionStatus: 'expired',
+          quotesEnabled: false
         });
         console.log(`Subscription expired for user ${userId}`);
         break;
@@ -114,7 +127,8 @@ router.post('/webhook', async (req, res) => {
         // When a subscription is resumed after being paused
         await User.findByIdAndUpdate(userId, { 
           isPay: true,
-          subscriptionStatus: 'active'
+          subscriptionStatus: 'active',
+          quotesEnabled: true
         });
         console.log(`Subscription unpaused for user ${userId}`);
         break;
@@ -131,8 +145,18 @@ router.post('/webhook', async (req, res) => {
         // When a subscription payment succeeds
         await User.findByIdAndUpdate(userId, { 
           isPay: true,
-          subscriptionStatus: 'active'
+          subscriptionStatus: 'active',
+          quotesEnabled: true
         });
+        
+        // Get user to send receipt
+        const user = await User.findById(userId);
+        if (user) {
+          await sendReceiptEmail(user, {
+            orderId: body.data.attributes.order_id || body.data.id
+          });
+        }
+        
         console.log(`Subscription payment successful for user ${userId}`);
         break;
         
