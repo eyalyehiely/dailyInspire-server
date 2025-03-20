@@ -83,27 +83,45 @@ router.post('/webhook', async (req, res) => {
     console.log(`Received Lemon Squeezy webhook: ${eventName}`);
     console.log('Webhook data:', JSON.stringify(body, null, 2));
     
-    // Extract user ID from custom data
+    // Extract user ID from custom data - more thorough search in all possible locations
     let userId;
     
-    // Different event types may have custom data in different locations
-    if (body.data?.attributes?.custom_data?.user_id) {
-      // Direct from custom_data object if it exists
-      userId = body.data.attributes.custom_data.user_id;
-      console.log('Found user_id in custom_data:', userId);
-    } else if (body.data?.attributes?.first_order_item?.custom_data?.user_id) {
-      // From first order item if available
-      userId = body.data.attributes.first_order_item.custom_data.user_id;
-      console.log('Found user_id in first_order_item:', userId);
-    } else if (body.meta?.custom_data?.user_id) {
-      // From meta custom data if available
-      userId = body.meta.custom_data.user_id;
-      console.log('Found user_id in meta custom_data:', userId);
-    } else if (body.data?.relationships?.order?.data?.id) {
-      // Try to find from order data directly
-      console.log('Looking for order details to find user_id');
-      
-      // We could fetch the order details here if needed in the future
+    // Check all possible locations for user_id
+    const possibleLocations = [
+      body.data?.attributes?.custom_data?.user_id,
+      body.data?.attributes?.first_order_item?.custom_data?.user_id,
+      body.meta?.custom_data?.user_id,
+      body.data?.attributes?.custom_data?.userId,
+      body.data?.attributes?.first_order_item?.custom_data?.userId,
+      body.meta?.custom_data?.userId,
+      // Check for checkout URL custom parameters
+      body.data?.attributes?.urls?.checkout_url,
+    ];
+    
+    // Try each location
+    for (const location of possibleLocations) {
+      if (location) {
+        // If it's a URL, try to extract user_id from the query string
+        if (typeof location === 'string' && location.includes('checkout') && location.includes('user_id')) {
+          try {
+            const url = new URL(location);
+            const params = new URLSearchParams(url.search);
+            const customUserIdParam = params.get('checkout[custom][user_id]');
+            if (customUserIdParam) {
+              userId = customUserIdParam;
+              console.log('Extracted user_id from checkout URL:', userId);
+              break;
+            }
+          } catch (e) {
+            console.log('Failed to parse URL:', location);
+          }
+        } else {
+          // Direct value
+          userId = location;
+          console.log(`Found user_id in webhook data:`, userId);
+          break;
+        }
+      }
     }
     
     if (!userId) {
@@ -673,6 +691,28 @@ router.get('/test-update-user/:userId', async (req, res) => {
   } catch (error) {
     console.error('Error in test update endpoint:', error);
     return res.status(500).json({ error: error.message });
+  }
+});
+
+// Route to log checkout URL attempts
+router.post('/log-checkout', auth, async (req, res) => {
+  try {
+    console.log('===== CHECKOUT URL LOGGED =====');
+    console.log('User ID:', req.user.id);
+    console.log('Checkout URL:', req.body.checkoutUrl);
+    
+    // Update user with last checkout URL attempt
+    await User.findByIdAndUpdate(req.user.id, {
+      lastCheckoutAttempt: {
+        url: req.body.checkoutUrl,
+        timestamp: new Date()
+      }
+    });
+    
+    return res.status(200).json({ message: 'Checkout URL logged' });
+  } catch (error) {
+    console.error('Error logging checkout:', error);
+    return res.status(500).json({ message: 'Server error' });
   }
 });
 

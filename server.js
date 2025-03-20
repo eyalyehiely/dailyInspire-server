@@ -60,6 +60,37 @@ app.get('/api/profile', auth, completeRegistration, (req, res) => {
 // Initialize the scheduler when the server starts
 startScheduler();
 
+// Start the server
 app.listen(port, () => {
-  console.log(`Server is running at http://localhost:${port}`);
+  console.log(`Server running on port ${port}`);
+  
+  // Check webhook configuration
+  checkWebhookConfiguration();
 });
+
+// Function to check webhook configuration
+function checkWebhookConfiguration() {
+  console.log('\n===== CHECKING WEBHOOK CONFIGURATION =====');
+  
+  const webhookUrl = process.env.LEMON_SQUEEZY_WEBHOOK_URL;
+  const webhookSecret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET;
+  
+  if (!webhookUrl) {
+    console.error('⚠️ LEMON_SQUEEZY_WEBHOOK_URL is not set in environment variables');
+    console.error('Payment webhooks will not work correctly without this!');
+  } else if (webhookUrl.includes('YOUR_SERVER_URL')) {
+    console.error('⚠️ LEMON_SQUEEZY_WEBHOOK_URL contains placeholder value:', webhookUrl);
+    console.error('Please update this to your actual server URL');
+  } else {
+    console.log('✅ LEMON_SQUEEZY_WEBHOOK_URL is set to:', webhookUrl);
+  }
+  
+  if (!webhookSecret) {
+    console.error('⚠️ LEMON_SQUEEZY_WEBHOOK_SECRET is not set in environment variables');
+    console.error('Payment webhook verification will not work without this!');
+  } else {
+    console.log('✅ LEMON_SQUEEZY_WEBHOOK_SECRET is set');
+  }
+  
+  console.log('=========================================\n');
+}

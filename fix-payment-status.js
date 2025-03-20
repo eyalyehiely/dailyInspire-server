@@ -1,3 +1,13 @@
+/**
+ * Script to manually fix a user's payment status
+ * 
+ * Usage:
+ * 1. Make sure MongoDB connection is configured in .env
+ * 2. Run: node fix-payment-status.js <email-or-id>
+ *
+ * This script will mark a user as paid and complete their registration
+ */
+
 const mongoose = require('mongoose');
 const User = require('./models/User');
 require('dotenv').config();

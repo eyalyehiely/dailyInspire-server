@@ -25,7 +25,7 @@ const verifyWebhookSignature = (signature, body) => {
   // Check if webhook secret is configured
   if (!process.env.LEMON_SQUEEZY_WEBHOOK_SECRET) {
     console.error('⚠️ LEMON_SQUEEZY_WEBHOOK_SECRET is not set in environment variables');
-    return true; // Accept webhooks without verification if secret is not set
+    return false; // Don't accept webhooks without verification - changed from true to false
   }
   
   try {

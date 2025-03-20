@@ -41,6 +41,20 @@ const UserSchema = new mongoose.Schema({
     enum: ['none', 'active', 'cancelled', 'expired', 'paused', 'payment_failed'],
     default: 'none'
   },
+  paymentUpdatedAt: {
+    type: Date,
+    default: null
+  },
+  lastCheckoutAttempt: {
+    url: {
+      type: String,
+      default: null
+    },
+    timestamp: {
+      type: Date,
+      default: null
+    }
+  },
   preferredTime: {
     type: String,
     default: "07:00", // Default time (24-hour format)
