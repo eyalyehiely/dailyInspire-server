@@ -177,7 +177,11 @@ router.get('/status', auth, async (req, res) => {
     const user = await User.findById(req.user.id);
     return res.json({ 
       isPaid: user.isPay,
-      subscriptionStatus: user.subscriptionStatus || 'none'
+      subscriptionStatus: user.subscriptionStatus || 'none',
+      checkoutId: process.env.LEMON_SQUEEZY_CHECKOUT_ID,
+      productId: process.env.LEMON_SQUEEZY_PRODUCT_ID,
+      variantId: process.env.LEMON_SQUEEZY_VARIANT_ID,
+      userId: req.user.id
     });
   } catch (error) {
     console.error('Error checking payment status:', error);
