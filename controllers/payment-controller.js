@@ -141,13 +141,13 @@ const generateLemonCheckoutUrl = (userId) => {
     throw new Error('Missing variant ID in environment variables');
   }
   
-  // LemonSqueezy checkout URL format - use the direct variant URL
-  // Format: https://checkout.lemonsqueezy.com/buy/[variant]
-  const baseUrl = `https://checkout.lemonsqueezy.com/buy/${variantId}`;
+  // UPDATED: Using the store-specific domain that matches the LemonSqueezy setup
+  // Format: https://dailyinspire.lemonsqueezy.com/buy/[variant-uuid]
+  const baseUrl = `https://dailyinspire.lemonsqueezy.com/buy/${variantId}`;
   
   // Create the full URL with properly encoded parameters
-  // Note: We're not using URLSearchParams as it doesn't work correctly with LemonSqueezy's nested parameters
-  const fullUrl = `${baseUrl}?checkout[custom][user_id]=${encodeURIComponent(userId || 'unknown')}`;
+  // Note: Adding both the custom user_id parameter and the discount parameter
+  const fullUrl = `${baseUrl}?checkout[custom][user_id]=${encodeURIComponent(userId || 'unknown')}&discount=0`;
   
   console.log('Generated LemonSqueezy checkout URL:', fullUrl);
   

@@ -255,25 +255,23 @@ router.get('/test-lemon-config', async (req, res) => {
 router.get('/debug-checkout', async (req, res) => {
   try {
     const testUserId = 'test-user-123';
-    const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID || '730358';
+    const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID || '9e44dcc7-edab-43f0-b9a2-9d663d4af336';
     
     // Create URLs with different formats for testing
     const urls = {
-      // Standard format
-      standard: `https://checkout.lemonsqueezy.com/buy/${variantId}?checkout[custom][user_id]=${testUserId}`,
+      // Store-specific domain format (based on actual URL pattern)
+      storeSpecific: `https://dailyinspire.lemonsqueezy.com/buy/${variantId}?checkout[custom][user_id]=${testUserId}&discount=0`,
       
       // With encoded brackets
-      encoded: `https://checkout.lemonsqueezy.com/buy/${variantId}?checkout%5Bcustom%5D%5Buser_id%5D=${testUserId}`,
+      encoded: `https://dailyinspire.lemonsqueezy.com/buy/${variantId}?checkout%5Bcustom%5D%5Buser_id%5D=${testUserId}&discount=0`,
       
       // Using searchParams
       withSearchParams: (() => {
-        const url = new URL(`https://checkout.lemonsqueezy.com/buy/${variantId}`);
+        const url = new URL(`https://dailyinspire.lemonsqueezy.com/buy/${variantId}`);
         url.searchParams.append('checkout[custom][user_id]', testUserId);
+        url.searchParams.append('discount', '0');
         return url.toString();
       })(),
-      
-      // Simple format without brackets
-      simple: `https://checkout.lemonsqueezy.com/buy/${variantId}?user_id=${testUserId}`,
       
       // Using the helper function
       fromHelper: generateLemonCheckoutUrl(testUserId)
