@@ -72,15 +72,29 @@ router.post('/webhook', async (req, res) => {
     
     // Log the incoming webhook for debugging
     console.log(`Received Lemon Squeezy webhook: ${eventName}`);
+    console.log('Webhook data:', JSON.stringify(body, null, 2));
     
-    // Extract user ID from custom data (ensure this is passed during checkout)
+    // Extract user ID from custom data
     let userId;
-    if (body.data?.attributes?.custom_data) {
+    
+    // Different event types may have custom data in different locations
+    if (body.data?.attributes?.custom_data?.user_id) {
+      // Direct from custom_data object if it exists
       userId = body.data.attributes.custom_data.user_id;
+      console.log('Found user_id in custom_data:', userId);
+    } else if (body.data?.attributes?.first_order_item?.custom_data?.user_id) {
+      // From first order item if available
+      userId = body.data.attributes.first_order_item.custom_data.user_id;
+      console.log('Found user_id in first_order_item:', userId);
+    } else if (body.meta?.custom_data?.user_id) {
+      // From meta custom data if available
+      userId = body.meta.custom_data.user_id;
+      console.log('Found user_id in meta custom_data:', userId);
     }
     
     if (!userId) {
-      console.warn('No user ID found in webhook data');
+      console.warn('No user ID found in webhook data, dumping full payload:');
+      console.warn(JSON.stringify(body, null, 2));
       return res.status(200).json({ received: true, status: 'No user ID found' });
     }
     

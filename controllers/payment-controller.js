@@ -135,29 +135,30 @@ const getUserPaymentStatus = async (userId) => {
 
 // Generate a direct checkout URL for LemonSqueezy
 const generateLemonCheckoutUrl = (userId) => {
-  // Use environment variable for store name or fall back to 'dailyinspire'
-  const storeName = process.env.LEMON_SQUEEZY_STORE_NAME || 'dailyinspire';
-  const productId = process.env.LEMON_SQUEEZY_PRODUCT_ID;
   const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID;
   
-  if (!productId || !variantId) {
-    throw new Error('Missing product or variant ID in environment variables');
+  if (!variantId) {
+    throw new Error('Missing variant ID in environment variables');
   }
   
-  // Use LemonSqueezy's standard checkout URL format
-  // Format 1: https://[store].lemonsqueezy.com/checkout/buy/[product]?variant=[variant]
-  const checkoutUrl1 = `https://${storeName}.lemonsqueezy.com/checkout/buy/${productId}?variant=${variantId}&checkout[custom][user_id]=${userId || 'unknown'}&checkout[tax_status]=disabled`;
+  // LemonSqueezy checkout URL format - use the direct variant URL
+  // Format: https://checkout.lemonsqueezy.com/buy/[variant]
+  const checkoutUrl = `https://checkout.lemonsqueezy.com/buy/${variantId}`;
   
-  // Format 2: https://checkout.lemonsqueezy.com/buy/[variant]?media=0
-  const checkoutUrl2 = `https://checkout.lemonsqueezy.com/buy/${variantId}?checkout[custom][user_id]=${userId || 'unknown'}&checkout[tax_status]=disabled`;
+  // Create URL parameters
+  const params = new URLSearchParams();
   
-  // Log both formats for debugging
-  console.log('Generated LemonSqueezy checkout URLs:');
-  console.log('Format 1:', checkoutUrl1);
-  console.log('Format 2:', checkoutUrl2);
+  // Add the user ID to custom data
+  if (userId) {
+    params.append('checkout[custom][user_id]', userId);
+  }
   
-  // Use the second format which is more reliable
-  return checkoutUrl2;
+  // Create the full URL with parameters
+  const fullUrl = `${checkoutUrl}?${params.toString()}`;
+  
+  console.log('Generated LemonSqueezy checkout URL:', fullUrl);
+  
+  return fullUrl;
 };
 
 module.exports = {
