@@ -14,17 +14,12 @@ router.get('/checkout-info', auth, async (req, res) => {
       return res.json({ isPaid: true, message: 'You already have premium access' });
     }
     
-    // Get the product ID from environment variable
-    const productId = process.env.LEMON_SQUEEZY_PRODUCT_ID;
-    const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID;
-    
-    // Create a dynamic checkout URL with custom data
-    const checkoutUrl = `${process.env.LEMON_SQUEEZY_STORE_URL}/checkout/buy/${productId}?variant=${variantId}&checkout[custom][user_id]=${req.user.id}`;
-    
-    // Return checkout information
+    // Return Lemon Squeezy checkout information
+    // - For overlay checkout use checkoutId (preferred method)
+    // - For redirect checkout use checkoutUrl
     return res.json({
       isPaid: false,
-      checkoutUrl,
+      checkoutId: process.env.LEMON_SQUEEZY_CHECKOUT_ID,
       userId: req.user.id
     });
   } catch (error) {
