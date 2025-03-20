@@ -13,16 +13,18 @@ const { sendWelcomeEmail } = require('../controllers/user-controller');
 // Route to get payment page information
 router.get('/checkout-info', auth, async (req, res) => {
   try {
+    console.log('=== CHECKOUT INFO REQUEST ===');
+    console.log('User ID:', req.user.id);
+    
     // Check if user is already paid
     const user = await User.findById(req.user.id);
     if (user.isPay) {
+      console.log('User already has premium access:', req.user.id);
       return res.json({ isPaid: true, message: 'You already have premium access' });
     }
     
     // Log environment variables for debugging
     console.log("Payment checkout info - Environment variables:");
-    console.log("CHECKOUT_ID:", process.env.LEMON_SQUEEZY_CHECKOUT_ID);
-    console.log("PRODUCT_ID:", process.env.LEMON_SQUEEZY_PRODUCT_ID);
     console.log("VARIANT_ID:", process.env.LEMON_SQUEEZY_VARIANT_ID);
     
     // Generate direct checkout URL
@@ -33,8 +35,6 @@ router.get('/checkout-info', auth, async (req, res) => {
     // Return Lemon Squeezy checkout information
     const responseData = {
       isPaid: false,
-      checkoutId: process.env.LEMON_SQUEEZY_CHECKOUT_ID,
-      productId: process.env.LEMON_SQUEEZY_PRODUCT_ID,
       variantId: process.env.LEMON_SQUEEZY_VARIANT_ID,
       userId: req.user.id,
       directCheckoutUrl
@@ -236,16 +236,57 @@ router.get('/status', auth, async (req, res) => {
 // Route for testing lemon squeezy configuration
 router.get('/test-lemon-config', async (req, res) => {
   try {
+    const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID;
+    const checkoutUrl = `https://checkout.lemonsqueezy.com/buy/${variantId}`;
+    
     return res.json({
       message: 'Lemon Squeezy configuration',
-      store: 'dailyinspire',
-      checkoutId: process.env.LEMON_SQUEEZY_CHECKOUT_ID,
-      productId: process.env.LEMON_SQUEEZY_PRODUCT_ID,
-      variantId: process.env.LEMON_SQUEEZY_VARIANT_ID,
-      checkoutUrl: `https://dailyinspire.lemonsqueezy.com/checkout/buy/${process.env.LEMON_SQUEEZY_PRODUCT_ID}?variant=${process.env.LEMON_SQUEEZY_VARIANT_ID}`
+      variantId: variantId,
+      checkoutUrl: checkoutUrl,
+      sampleUrlWithUserId: `${checkoutUrl}?checkout[custom][user_id]=test-user-id`
     });
   } catch (error) {
     console.error('Error in test endpoint:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Debug endpoint for testing checkout URLs
+router.get('/debug-checkout', async (req, res) => {
+  try {
+    const testUserId = 'test-user-123';
+    const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID || '730358';
+    
+    // Create URLs with different formats for testing
+    const urls = {
+      // Standard format
+      standard: `https://checkout.lemonsqueezy.com/buy/${variantId}?checkout[custom][user_id]=${testUserId}`,
+      
+      // With encoded brackets
+      encoded: `https://checkout.lemonsqueezy.com/buy/${variantId}?checkout%5Bcustom%5D%5Buser_id%5D=${testUserId}`,
+      
+      // Using searchParams
+      withSearchParams: (() => {
+        const url = new URL(`https://checkout.lemonsqueezy.com/buy/${variantId}`);
+        url.searchParams.append('checkout[custom][user_id]', testUserId);
+        return url.toString();
+      })(),
+      
+      // Simple format without brackets
+      simple: `https://checkout.lemonsqueezy.com/buy/${variantId}?user_id=${testUserId}`,
+      
+      // Using the helper function
+      fromHelper: generateLemonCheckoutUrl(testUserId)
+    };
+    
+    return res.json({
+      message: 'Debug checkout URLs',
+      userId: testUserId,
+      variantId: variantId,
+      urls
+    });
+  } catch (error) {
+    console.error('Error in debug endpoint:', error);
     return res.status(500).json({ message: 'Server error' });
   }
 });

@@ -143,18 +143,11 @@ const generateLemonCheckoutUrl = (userId) => {
   
   // LemonSqueezy checkout URL format - use the direct variant URL
   // Format: https://checkout.lemonsqueezy.com/buy/[variant]
-  const checkoutUrl = `https://checkout.lemonsqueezy.com/buy/${variantId}`;
+  const baseUrl = `https://checkout.lemonsqueezy.com/buy/${variantId}`;
   
-  // Create URL parameters
-  const params = new URLSearchParams();
-  
-  // Add the user ID to custom data
-  if (userId) {
-    params.append('checkout[custom][user_id]', userId);
-  }
-  
-  // Create the full URL with parameters
-  const fullUrl = `${checkoutUrl}?${params.toString()}`;
+  // Create the full URL with properly encoded parameters
+  // Note: We're not using URLSearchParams as it doesn't work correctly with LemonSqueezy's nested parameters
+  const fullUrl = `${baseUrl}?checkout[custom][user_id]=${encodeURIComponent(userId || 'unknown')}`;
   
   console.log('Generated LemonSqueezy checkout URL:', fullUrl);
   
