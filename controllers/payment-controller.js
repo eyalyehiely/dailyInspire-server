@@ -146,10 +146,10 @@ const generateLemonCheckoutUrl = (userId) => {
   
   // Use LemonSqueezy's standard checkout URL format
   // Format 1: https://[store].lemonsqueezy.com/checkout/buy/[product]?variant=[variant]
-  const checkoutUrl1 = `https://${storeName}.lemonsqueezy.com/checkout/buy/${productId}?variant=${variantId}&checkout[custom][user_id]=${userId || 'unknown'}`;
+  const checkoutUrl1 = `https://${storeName}.lemonsqueezy.com/checkout/buy/${productId}?variant=${variantId}&checkout[custom][user_id]=${userId || 'unknown'}&checkout[tax_status]=disabled`;
   
   // Format 2: https://checkout.lemonsqueezy.com/buy/[variant]?media=0
-  const checkoutUrl2 = `https://checkout.lemonsqueezy.com/buy/${variantId}?checkout[custom][user_id]=${userId || 'unknown'}`;
+  const checkoutUrl2 = `https://checkout.lemonsqueezy.com/buy/${variantId}?checkout[custom][user_id]=${userId || 'unknown'}&checkout[tax_status]=disabled`;
   
   // Log both formats for debugging
   console.log('Generated LemonSqueezy checkout URLs:');
