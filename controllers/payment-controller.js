@@ -135,18 +135,17 @@ const getUserPaymentStatus = async (userId) => {
 
 // Generate a direct checkout URL for LemonSqueezy
 const generateLemonCheckoutUrl = (userId) => {
-  const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID;
+  const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID || '9e44dcc7-edab-43f0-b9a2-9d663d4af336';
   
   if (!variantId) {
     throw new Error('Missing variant ID in environment variables');
   }
   
-  // UPDATED: Using the store-specific domain that matches the LemonSqueezy setup
-  // Format: https://dailyinspire.lemonsqueezy.com/buy/[variant-uuid]
+  // Fixed URL format with proper path structure
+  // Format: https://dailyinspire.lemonsqueezy.com/buy/{variant-uuid}?params
   const baseUrl = `https://dailyinspire.lemonsqueezy.com/buy/${variantId}`;
   
-  // Create the full URL with properly encoded parameters
-  // Note: Adding both the custom user_id parameter and the discount parameter
+  // Add query parameters with ? separator
   const fullUrl = `${baseUrl}?checkout[custom][user_id]=${encodeURIComponent(userId || 'unknown')}&discount=0`;
   
   console.log('Generated LemonSqueezy checkout URL:', fullUrl);

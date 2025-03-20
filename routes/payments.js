@@ -236,14 +236,14 @@ router.get('/status', auth, async (req, res) => {
 // Route for testing lemon squeezy configuration
 router.get('/test-lemon-config', async (req, res) => {
   try {
-    const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID;
-    const checkoutUrl = `https://checkout.lemonsqueezy.com/buy/${variantId}`;
+    const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID || '9e44dcc7-edab-43f0-b9a2-9d663d4af336';
+    const checkoutUrl = `https://dailyinspire.lemonsqueezy.com/buy/${variantId}`;
     
     return res.json({
       message: 'Lemon Squeezy configuration',
       variantId: variantId,
       checkoutUrl: checkoutUrl,
-      sampleUrlWithUserId: `${checkoutUrl}?checkout[custom][user_id]=test-user-id`
+      sampleUrlWithUserId: `${checkoutUrl}?checkout[custom][user_id]=test-user-id&discount=0`
     });
   } catch (error) {
     console.error('Error in test endpoint:', error);
