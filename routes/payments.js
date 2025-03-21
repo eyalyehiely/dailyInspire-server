@@ -20,6 +20,11 @@ router.get('/checkout-info', auth, async (req, res) => {
     
     // Check if user is already paid
     const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // If user already has paid status, return that info
     if (user.isPay) {
       console.log('User already has premium access:', req.user.id);
       return res.json({ 
@@ -30,19 +35,16 @@ router.get('/checkout-info', auth, async (req, res) => {
       });
     }
     
-    // Log environment variables for debugging
-    console.log("Payment checkout info - Environment variables:");
-    console.log("VARIANT_ID:", process.env.LEMON_SQUEEZY_VARIANT_ID);
-    
     // Generate direct checkout URL
     const directCheckoutUrl = generateLemonCheckoutUrl(req.user.id);
     console.log("Generated checkout URL with user ID:", req.user.id);
     console.log("Full checkout URL:", directCheckoutUrl);
     
-    // Return Lemon Squeezy checkout information
+    // Return Lemon Squeezy checkout information with more complete data
     const responseData = {
       isPaid: false,
-      variantId: process.env.LEMON_SQUEEZY_VARIANT_ID,
+      variantId: process.env.LEMON_SQUEEZY_VARIANT_ID || '9e44dcc7-edab-43f0-b9a2-9d663d4af336',
+      productId: process.env.LEMON_SQUEEZY_PRODUCT_ID || '471688',
       userId: req.user.id,
       directCheckoutUrl,
       subscriptionStatus: user.subscriptionStatus || 'none',
