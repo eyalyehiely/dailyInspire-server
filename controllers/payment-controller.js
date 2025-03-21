@@ -197,10 +197,11 @@ const getUserPaymentStatus = async (userId) => {
 
 // Generate a direct checkout URL for LemonSqueezy
 const generateLemonCheckoutUrl = (userId) => {
-  const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID || '9e44dcc7-edab-43f0-b9a2-9d663d4af336';
+  // Use the variant slug instead of the ID
+  const variantSlug = '9e44dcc7-edab-43f0-b9a2-9d663d4af336';
   
-  if (!variantId) {
-    throw new Error('Missing variant ID in environment variables');
+  if (!variantSlug) {
+    throw new Error('Missing variant slug');
   }
   
   if (!userId) {
@@ -214,11 +215,18 @@ const generateLemonCheckoutUrl = (userId) => {
   const appUrl = process.env.APP_URL || 'https://app.dailyinspire.xyz';
   
   // Fixed URL format with proper path structure
-  // Format: https://dailyinspire.lemonsqueezy.com/buy/{variant-uuid}?params
-  const baseUrl = `https://dailyinspire.lemonsqueezy.com/buy/${variantId}`;
+  // Format: https://dailyinspire.lemonsqueezy.com/buy/{variant-slug}?params
+  const baseUrl = `https://dailyinspire.lemonsqueezy.com/buy/${variantSlug}`;
   
-  // Add query parameters with ? separator, including success and cancel URLs
-  const fullUrl = `${baseUrl}?checkout[custom][user_id]=${encodeURIComponent(userId || 'unknown')}&discount=0&checkout[success_url]=${encodeURIComponent(`${appUrl}/payment-success`)}&checkout[cancel_url]=${encodeURIComponent(`${appUrl}/payment`)}`;
+  // Create a URLSearchParams object for proper parameter encoding
+  const params = new URLSearchParams();
+  params.append('checkout[custom][user_id]', userId || 'unknown');
+  params.append('discount', '0');
+  params.append('checkout[success_url]', `${appUrl}/payment-success`);
+  params.append('checkout[cancel_url]', `${appUrl}/payment`);
+  
+  // Combine base URL with properly encoded parameters
+  const fullUrl = `${baseUrl}?${params.toString()}`;
   
   console.log('Generated LemonSqueezy checkout URL:', fullUrl);
   
