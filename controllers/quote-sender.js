@@ -40,12 +40,29 @@ async function sendQuoteEmail(email, quote) {
     to: email,
     subject: 'Your Daily Inspiration',
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2>Your Daily Quote</h2>
-        <blockquote style="border-left: 4px solid #ccc; padding-left: 15px; font-style: italic;">
-          "${quote.text}"
-        </blockquote>
-        <p style="text-align: right;">— ${quote.author}</p>
+      <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px 20px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #4F46E5; font-size: 24px; margin: 0; font-weight: 600;">Your Daily Inspiration</h1>
+          <div style="width: 50px; height: 3px; background: linear-gradient(to right, #4F46E5, #9181F4); margin: 15px auto;"></div>
+        </div>
+        
+        <div style="background-color: #f8f9fa; padding: 30px; border-radius: 6px; margin-bottom: 25px;">
+          <blockquote style="border-left: 3px solid #4F46E5; padding-left: 20px; margin: 0; font-style: italic; font-size: 18px; line-height: 1.5; color: #333;">
+            "${quote.text}"
+          </blockquote>
+          <p style="text-align: right; margin-top: 15px; font-size: 16px; color: #666; font-weight: 500;">— ${quote.author}</p>
+        </div>
+        
+        <div style="margin-top: 20px; text-align: center; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+          <p style="margin: 0 0 10px 0;">Brought to you by DailyInspire</p>
+          <p style="margin: 0;">
+            <a href="https://app.dailyinspire.xyz" style="color: #4F46E5; text-decoration: none; margin: 0 10px;">Our Website</a> |
+            <a href="mailto:support@dailyinspire.xyz" style="color: #4F46E5; text-decoration: none; margin: 0 10px;">Contact Support</a>
+          </p>
+          <p style="margin: 15px 0 0 0; font-size: 12px; color: #999;">
+            © ${new Date().getFullYear()} DailyInspire. All rights reserved.
+          </p>
+        </div>
       </div>
     `
   };

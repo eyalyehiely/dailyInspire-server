@@ -6,41 +6,53 @@
  * 2. Run: node list-users.js
  */
 
+require('dotenv').config();
 const mongoose = require('mongoose');
 const User = require('./models/User');
-require('dotenv').config();
 
-async function listUsers() {
+// Connect to MongoDB
+const connectDB = async () => {
   try {
-    // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI);
-    console.log('Connected to MongoDB');
+    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
+    const dbName = process.env.DB_NAME || 'my-quotes-app';
+    const conn = await mongoose.connect(`${mongoURI}/${dbName}`);
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
+  } catch (err) {
+    console.error('Error connecting to MongoDB:', err.message);
+    process.exit(1);
+  }
+};
+
+// List all users
+const listUsers = async () => {
+  try {
+    await connectDB();
     
     // Find all users
-    const users = await User.find({}).sort({ createdAt: -1 }).limit(10);
+    const users = await User.find({}).select('_id email isPay isRegistrationComplete subscriptionStatus');
     
-    if (users.length === 0) {
-      console.log('No users found in the database.');
-      return;
-    }
+    console.log('\nUser List:');
+    console.log('==========');
     
-    console.log(`Found ${users.length} users:`);
-    
-    // Display each user
-    users.forEach((user, index) => {
-      console.log(`\n[${index + 1}] User: ${user.first_name} ${user.last_name} (${user.email})`);
-      console.log(`   ID: ${user._id.toString()}`);
-      console.log(`   Is Paid: ${user.isPay}`);
-      console.log(`   Subscription Status: ${user.subscriptionStatus || 'none'}`);
-      console.log(`   Registration Complete: ${user.isRegistrationComplete}`);
+    users.forEach(user => {
+      console.log(`ID: ${user._id}`);
+      console.log(`Email: ${user.email}`);
+      console.log(`Payment Status: ${user.isPay ? 'Paid' : 'Not Paid'}`);
+      console.log(`Registration Complete: ${user.isRegistrationComplete ? 'Yes' : 'No'}`);
+      console.log(`Subscription Status: ${user.subscriptionStatus || 'none'}`);
+      console.log('----------');
     });
     
-  } catch (error) {
-    console.error('Error listing users:', error);
-  } finally {
+    console.log(`\nTotal users: ${users.length}`);
+    
+    // Close the connection
     await mongoose.connection.close();
-    console.log('MongoDB connection closed');
+    console.log('Database connection closed');
+    
+  } catch (err) {
+    console.error('Error listing users:', err);
   }
-}
+};
 
+// Run the function
 listUsers(); 
