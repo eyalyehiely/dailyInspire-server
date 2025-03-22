@@ -165,6 +165,16 @@ router.get('/preferences', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
+    // Check if the user has an active or valid subscription
+    // Valid subscription statuses are 'active' or 'cancelled' (during grace period)
+    if (!user.isPay || (user.subscriptionStatus !== 'active' && user.subscriptionStatus !== 'cancelled')) {
+      return res.status(403).json({ 
+        message: 'Subscription required to access preferences',
+        status: user.subscriptionStatus,
+        code: 'subscription_required'
+      });
+    }
+    
     console.log("Sending user preferences with ID:", userId);
     
     res.status(200).json({
@@ -196,6 +206,16 @@ router.put('/preferences', auth, async (req, res) => {
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Check if the user has an active or valid subscription
+    // Valid subscription statuses are 'active' or 'cancelled' (during grace period)
+    if (!user.isPay || (user.subscriptionStatus !== 'active' && user.subscriptionStatus !== 'cancelled')) {
+      return res.status(403).json({ 
+        message: 'Subscription required to update preferences',
+        status: user.subscriptionStatus,
+        code: 'subscription_required'
+      });
     }
     
     // Update fields if provided

@@ -244,6 +244,7 @@ router.post('/webhook', async (req, res) => {
         // When a subscription is cancelled but still active until the end of the billing period
         await User.findByIdAndUpdate(userId, { 
           subscriptionStatus: 'cancelled'
+          // Don't disable quotes yet as user paid for the current period
         });
         console.log(`Subscription cancelled for user ${userId}`);
         break;
@@ -253,7 +254,7 @@ router.post('/webhook', async (req, res) => {
         await User.findByIdAndUpdate(userId, { 
           isPay: false,
           subscriptionStatus: 'expired',
-          quotesEnabled: false
+          quotesEnabled: false // Disable quotes when subscription has fully expired
         });
         console.log(`Subscription expired for user ${userId}`);
         break;
