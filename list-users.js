@@ -55,24 +55,44 @@ const listUsers = async () => {
   }
 };
 
-// Run the function
-listUsers();
-
+// Fix payment for users where webhook verification failed
 async function fixPayment() {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('Connected to MongoDB');
     
-    const userId = "67df12120374fcf1760e393b";
-    const subscriptionId = "1067414";
+    // Array of users to fix with their subscription IDs
+    const usersToFix = [
+      { userId: "67df12120374fcf1760e393b", subscriptionId: "1067414" },
+      { userId: "67df132e3836d964749a6496", subscriptionId: "1067415" }
+    ];
     
-    const result = await processSuccessfulPayment(userId, subscriptionId);
-    console.log('User updated:', result);
+    console.log(`Found ${usersToFix.length} users to fix...`);
+    
+    // Process each user
+    for (const user of usersToFix) {
+      console.log(`Processing user ID: ${user.userId}`);
+      try {
+        const result = await processSuccessfulPayment(user.userId, user.subscriptionId);
+        console.log(`User updated successfully: ${result.email}`);
+        console.log(`Payment status: ${result.isPay ? 'Paid' : 'Not Paid'}`);
+        console.log(`Subscription status: ${result.subscriptionStatus}`);
+      } catch (error) {
+        console.error(`Error updating user ${user.userId}:`, error.message);
+      }
+      console.log('----------');
+    }
+    
+    console.log('Payment fix completed!');
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error fixing payments:', error);
   } finally {
     await mongoose.connection.close();
+    console.log('Database connection closed');
   }
 }
 
-fixPayment(); 
+// Run the function
+// Comment/uncomment the function you want to run
+listUsers();
+// fixPayment(); 
