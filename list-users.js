@@ -9,6 +9,7 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const User = require('./models/User');
+const { processSuccessfulPayment } = require('./controllers/payment-controller');
 
 // Connect to MongoDB
 const connectDB = async () => {
@@ -55,4 +56,23 @@ const listUsers = async () => {
 };
 
 // Run the function
-listUsers(); 
+listUsers();
+
+async function fixPayment() {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('Connected to MongoDB');
+    
+    const userId = "67df12120374fcf1760e393b";
+    const subscriptionId = "1067414";
+    
+    const result = await processSuccessfulPayment(userId, subscriptionId);
+    console.log('User updated:', result);
+  } catch (error) {
+    console.error('Error:', error);
+  } finally {
+    await mongoose.connection.close();
+  }
+}
+
+fixPayment(); 
