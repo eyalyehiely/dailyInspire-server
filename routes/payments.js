@@ -7,7 +7,8 @@ const {
   sendReceiptEmail, 
   processSuccessfulPayment,
   generateLemonCheckoutUrl,
-  verifySubscriptionStatus
+  verifySubscriptionStatus,
+  lemonSqueezyApi
 } = require('../controllers/payment-controller');
 const { sendWelcomeEmail } = require('../controllers/user-controller');
 const mongoose = require('mongoose');
@@ -326,12 +327,48 @@ router.get('/status', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
+    // Check if the user has a subscription
+    let cardBrand = "";
+    let cardLastFour = "";
+    let customerPortalUrl = "";
+    let cancelSubscriptionUrl = "";
+    
+    // If user has a subscription ID, fetch card details and URLs from LemonSqueezy API
+    if (user.subscriptionId && user.isPay) {
+      try {
+        // Make a request to get subscription details from LemonSqueezy
+        const response = await lemonSqueezyApi.get(`/subscriptions/${user.subscriptionId}`);
+        if (response.data && response.data.data) {
+          const subData = response.data.data;
+          
+          // Extract card details
+          cardBrand = subData.attributes?.card_brand || "";
+          cardLastFour = subData.attributes?.card_last_four || "";
+          
+          // Extract URLs from the response
+          if (subData.attributes?.urls) {
+            customerPortalUrl = subData.attributes.urls.customer_portal || "";
+            cancelSubscriptionUrl = subData.attributes.urls.customer_portal || "";
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching subscription details:', err.message);
+        // Continue even if this fails, we'll just return the data we have
+      }
+    }
+    
     return res.json({
       isPaid: user.isPay || false,
       subscriptionStatus: user.subscriptionStatus || 'none',
       subscriptionId: user.subscriptionId,
       quotesEnabled: user.quotesEnabled || false,
-      paymentUpdatedAt: user.paymentUpdatedAt
+      paymentUpdatedAt: user.paymentUpdatedAt,
+      // Include payment method details
+      cardBrand: cardBrand,
+      cardLastFour: cardLastFour,
+      // Include subscription management URLs
+      customerPortalUrl: customerPortalUrl,
+      cancelSubscriptionUrl: cancelSubscriptionUrl,
     });
   } catch (error) {
     console.error('Error checking payment status:', error);
