@@ -18,7 +18,7 @@ async function fixProductionPayments() {
     // Array of users to fix with their subscription IDs from webhooks
     const usersToFix = [
       { userId: "67df12120374fcf1760e393b", subscriptionId: "1067414" },
-      { userId: "67df132e3836d964749a6496", subscriptionId: "1067415" }
+      { userId: "67df132e3836d964749a6496", subscriptionId: "1067450" }
     ];
     
     for (const user of usersToFix) {
