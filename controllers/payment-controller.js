@@ -17,7 +17,10 @@ const lemonSqueezyApi = axios.create({
 const verifyWebhookSignature = (signature, body) => {
   console.log('==== WEBHOOK SIGNATURE VERIFICATION ====');
   
-  // Log the first 500 characters of the body for debugging
+  // Log the raw body for debugging
+  console.log('Raw webhook body:', body);
+  
+  // Log the first 500 characters for a quick preview
   const bodyPreview = typeof body === 'string' ? body.substring(0, 500) : JSON.stringify(body).substring(0, 500);
   console.log('Webhook body preview:', bodyPreview);
   console.log('Received signature:', signature);
@@ -29,7 +32,8 @@ const verifyWebhookSignature = (signature, body) => {
   }
   
   try {
-    // Convert body to string if it's an object
+    // The key issue is here - LemonSqueezy signs the raw string body, not the parsed JSON
+    // Make sure we're working with the raw string version
     const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
     
     // Create HMAC using the webhook secret
@@ -40,8 +44,10 @@ const verifyWebhookSignature = (signature, body) => {
     console.log('Received signature:', signature);
     console.log('Secret used (length):', process.env.LEMON_SQUEEZY_WEBHOOK_SECRET?.length || 'missing');
     
-    // Try both the calculated signature and a trimmed version in case of whitespace issues
+    // Check for exact match first
     const isExactMatch = calculatedSignature === signature;
+    
+    // If no exact match, try trimmed versions
     const isTrimmedMatch = calculatedSignature.trim() === signature.trim();
     
     console.log('Exact signature match:', isExactMatch);

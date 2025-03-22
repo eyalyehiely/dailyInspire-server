@@ -17,12 +17,6 @@ const contactRoutes = require('./routes/contact');
 // Import and start the scheduler
 const { startScheduler } = require('./controllers/scheduler');
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Call this before setting up routes
-connectDB();
-
 // Apply CORS middleware
 app.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:5173', 'https://dailyinspire.up.railway.app','https://app.dailyinspire.xyz'],
@@ -30,9 +24,17 @@ app.use(cors({
   credentials: true
 }));
 
-// Add webhook logger middleware
+// Add webhook logger middleware BEFORE JSON parsing
+// This is crucial for capturing the raw body for webhook signature verification
 const webhookLogger = require('./middleware/webhook-logger');
 app.use(webhookLogger);
+
+// Only parse JSON after webhook logger has captured raw body
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Call this before setting up routes
+connectDB();
 
 // Add this before your routes
 app.use((req, res, next) => {

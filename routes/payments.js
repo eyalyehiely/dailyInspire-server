@@ -72,11 +72,13 @@ router.post('/webhook', async (req, res) => {
       return res.status(401).json({ error: 'Missing signature' });
     }
     
-    // Log the raw body for debugging
-    const rawBody = JSON.stringify(req.body);
-    console.log('Raw webhook body:', rawBody);
+    // Important: We need the raw body string for signature verification
+    // Express typically parses JSON, but we need the unparsed string
+    // This raw body should be accessed via req.rawBody which should be
+    // set in middleware before JSON parsing
+    const rawBody = req.rawBody || JSON.stringify(req.body);
     
-    // Verify the signature
+    // Verify the signature with the raw body
     const isSignatureValid = verifyWebhookSignature(signature, rawBody);
     
     if (!isSignatureValid) {
@@ -86,7 +88,8 @@ router.post('/webhook', async (req, res) => {
       return res.status(401).json({ error: 'Invalid signature' });
     }
     
-    const { body } = req;
+    // Parse the body (if it was provided raw)
+    const body = req.body || (typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody);
     const eventName = body.meta?.event_name;
     
     // Log the incoming webhook for debugging
