@@ -357,8 +357,8 @@ router.get('/status', auth, async (req, res) => {
       }
     }
     
-    return res.json({
-      isPaid: user.isPay || false,
+    const responsePayload = {
+      isPay: user.isPay || false,
       subscriptionStatus: user.subscriptionStatus || 'none',
       subscriptionId: user.subscriptionId,
       quotesEnabled: user.quotesEnabled || false,
@@ -369,7 +369,11 @@ router.get('/status', auth, async (req, res) => {
       // Include subscription management URLs
       customerPortalUrl: customerPortalUrl,
       cancelSubscriptionUrl: cancelSubscriptionUrl,
-    });
+    };
+    
+    console.log('Returning payment status (FULL):', JSON.stringify(responsePayload, null, 2));
+
+    return res.json(responsePayload);
   } catch (error) {
     console.error('Error checking payment status:', error);
     return res.status(500).json({ message: 'Server error' });
