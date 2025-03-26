@@ -69,7 +69,61 @@ const sendWelcomeEmail = async (user) => {
   }
 };
 
-// Export the function
+const sendEmailToOwner = async (user) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: process.env.EMAIL_SERVICE || 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+
+    // Format the preferred time for display
+    const timeFormat = new Intl.DateTimeFormat('en', {
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true,
+      timeZone: user.timezone || 'UTC'
+    });
+    const formattedTime = timeFormat.format(new Date(`2000-01-01T${user.preferredTime || '09:00'}`));
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || `Daily Inspirational Quotes <${process.env.EMAIL_USER}>`,
+      to: process.env.OWNER_EMAIL, // Send to owner's email
+      subject: 'New User Signup - Daily Inspirational Quotes',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2>New User Signup!</h2>
+          
+          <p>A new user has signed up for Daily Inspirational Quotes.</p>
+          
+          <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #333;">User Details</h3>
+            <p><strong>Name:</strong> ${user.first_name}</p>
+            <p><strong>Email:</strong> ${user.email}</p>
+            <p><strong>Daily Quote Time:</strong> ${formattedTime}</p>
+            <p><strong>Timezone:</strong> ${user.timezone || 'UTC'}</p>
+            <p><strong>Signup Date:</strong> ${new Date().toLocaleString()}</p>
+          </div>
+          
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+            <p style="color: #666; font-size: 14px;">This is an automated notification from your Daily Inspirational Quotes application.</p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Notification email sent to owner about new user: ${user.email}`);
+  } catch (error) {
+    console.error('Error sending notification email to owner:', error);
+    // Don't throw - we don't want to break the signup process if email fails
+  }
+};
+
+// Export the functions
 module.exports = {
-  sendWelcomeEmail
+  sendWelcomeEmail,
+  sendEmailToOwner
 }; 
