@@ -90,7 +90,7 @@ const sendEmailToOwner = async (user) => {
 
     const mailOptions = {
       from: process.env.EMAIL_FROM || `Daily Inspirational Quotes <${process.env.EMAIL_USER}>`,
-      to: process.env.OWNER_EMAIL, // Send to owner's email
+      to: process.env.EMAIL_FROM, // Send to owner's email
       subject: 'New User Signup - Daily Inspirational Quotes',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">

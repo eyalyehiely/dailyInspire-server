@@ -3,7 +3,7 @@ const router = express.Router();
 const { sendQuotesToAllUsers } = require('../controllers/quote-sender');
 const User = require('../models/User')
 const jwt = require('jsonwebtoken');
-const { sendWelcomeEmail } = require('../controllers/user-controller');
+const { sendWelcomeEmail, sendEmailToOwner } = require('../controllers/user-controller');
 // Add timezone validation utility
 const isValidTimezone = (timezone) => {
   try {
@@ -77,6 +77,15 @@ router.post('/signup', async (req, res) => {
     
     await user.save();
     
+    // Send notification email to owner about new signup
+    try {
+      await sendEmailToOwner(user);
+      console.log('Owner notification email sent successfully');
+    } catch (emailError) {
+      console.error('Error sending owner notification email:', emailError);
+      // Don't throw - we don't want to break the signup process if email fails
+    }
+    
     // Generate JWT token for auto-login
     const token = jwt.sign(
       { id: user._id },
@@ -99,8 +108,8 @@ router.post('/signup', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error during user signup:', error);
-    res.status(400).json({ message: 'Error creating user', error: error.message });
+    console.error('Signup error:', error);
+    res.status(500).json({ message: 'An error occurred during signup. Please try again.' });
   }
 });
 
