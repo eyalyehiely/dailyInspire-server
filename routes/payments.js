@@ -18,6 +18,7 @@ router.get('/checkout-info', auth, async (req, res) => {
   try {
     console.log('=== CHECKOUT INFO REQUEST ===');
     console.log('User ID:', req.user.id);
+    console.log('PADDLE_PRODUCT_ID:', process.env.PADDLE_PRODUCT_ID);
     
     // Check if user is already paid
     const user = await User.findById(req.user.id);
