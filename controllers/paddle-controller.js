@@ -125,13 +125,14 @@ const generateCheckoutUrl = (userId) => {
 
   // Create a URLSearchParams object for proper parameter encoding
   const params = new URLSearchParams();
-  params.append('product_id', productId);
-  params.append('user_id', userId || 'unknown');
+  params.append('items[0][price_id]', productId);
+  params.append('items[0][quantity]', '1');
+  params.append('customer_id', userId || 'unknown');
   params.append('success_url', `${appUrl}/payment-success`);
   params.append('cancel_url', `${appUrl}/payment`);
 
   // Return the Paddle checkout URL
-  return `https://checkout.paddle.com/checkout/${productId}?${params.toString()}`;
+  return `https://checkout.paddle.com/checkout/custom-checkout?${params.toString()}`;
 };
 
 // Verify a subscription status directly with the Paddle API
