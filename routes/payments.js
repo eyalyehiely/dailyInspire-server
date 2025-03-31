@@ -8,7 +8,8 @@ const {
   processSuccessfulPayment,
   generateCheckoutUrl,
   verifySubscriptionStatus,
-  paddleApi
+  paddleApi,
+  generateClientToken
 } = require('../controllers/paddle-controller');
 const { sendWelcomeEmail } = require('../controllers/user-controller');
 const mongoose = require('mongoose');
@@ -37,16 +38,11 @@ router.get('/checkout-info', auth, async (req, res) => {
       });
     }
     
-    // Generate client-side token
-    const clientToken = await generateClientToken(req.user.id);
-    console.log("Generated client token for user:", req.user.id);
-    
     // Return Paddle checkout information
     const responseData = {
       isPaid: false,
       productId: process.env.PADDLE_PRODUCT_ID,
       userId: req.user.id,
-      clientToken,
       subscriptionStatus: user.subscriptionStatus || 'none',
       subscriptionId: user.subscriptionId || null
     };
