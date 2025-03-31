@@ -173,24 +173,14 @@ const generateClientToken = async (userId) => {
     throw new Error('Missing userId when generating client token');
   }
 
-  try {
-    const response = await paddleApi.post('/checkout/tokens', {
-      items: [{
-        price_id: process.env.PADDLE_PRODUCT_ID,
-        quantity: 1
-      }],
-      custom_data: {
-        user_id: userId
-      },
-      success_url: `${process.env.APP_URL}/payment-success`,
-      cancel_url: `${process.env.APP_URL}/payment`
-    });
-
-    return response.data.token;
-  } catch (error) {
-    console.error('Error generating client token:', error);
-    throw error;
+  // Use the client token from environment variables
+  const clientToken = process.env.PADDLE_CLIENT_TOKEN;
+  
+  if (!clientToken) {
+    throw new Error('Missing Paddle client token in environment variables');
   }
+
+  return clientToken;
 };
 
 module.exports = {
