@@ -6,10 +6,10 @@ const {
   verifyWebhookSignature, 
   sendReceiptEmail, 
   processSuccessfulPayment,
-  generateLemonCheckoutUrl,
+  generateCheckoutUrl,
   verifySubscriptionStatus,
-  lemonSqueezyApi
-} = require('../controllers/payment-controller');
+  paddleApi
+} = require('../controllers/paddle-controller');
 const { sendWelcomeEmail } = require('../controllers/user-controller');
 const mongoose = require('mongoose');
 
@@ -37,15 +37,14 @@ router.get('/checkout-info', auth, async (req, res) => {
     }
     
     // Generate direct checkout URL
-    const directCheckoutUrl = generateLemonCheckoutUrl(req.user.id);
+    const directCheckoutUrl = generateCheckoutUrl(req.user.id);
     console.log("Generated checkout URL with user ID:", req.user.id);
     console.log("Full checkout URL:", directCheckoutUrl);
     
-    // Return Lemon Squeezy checkout information with more complete data
+    // Return Paddle checkout information
     const responseData = {
       isPaid: false,
-      variantId: process.env.LEMON_SQUEEZY_VARIANT_ID || '9e44dcc7-edab-43f0-b9a2-9d663d4af336',
-      productId: process.env.LEMON_SQUEEZY_PRODUCT_ID || '471688',
+      productId: process.env.PADDLE_PRODUCT_ID,
       userId: req.user.id,
       directCheckoutUrl,
       subscriptionStatus: user.subscriptionStatus || 'none',
@@ -60,23 +59,20 @@ router.get('/checkout-info', auth, async (req, res) => {
   }
 });
 
-// Webhook endpoint for LemonSqueezy to handle all subscription events
+// Webhook endpoint for Paddle to handle all subscription events
 router.post('/webhook', async (req, res) => {
   try {
     console.log('===== WEBHOOK RECEIVED =====');
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
     
-    // Verify webhook signature from LemonSqueezy
-    const signature = req.headers['x-signature'];
+    // Verify webhook signature from Paddle
+    const signature = req.headers['x-paddle-signature'];
     if (!signature) {
       console.warn('Missing webhook signature');
       return res.status(401).json({ error: 'Missing signature' });
     }
     
     // Important: We need the raw body string for signature verification
-    // Express typically parses JSON, but we need the unparsed string
-    // This raw body should be accessed via req.rawBody which should be
-    // set in middleware before JSON parsing
     const rawBody = req.rawBody || JSON.stringify(req.body);
     
     // Verify the signature with the raw body
@@ -84,237 +80,75 @@ router.post('/webhook', async (req, res) => {
     
     if (!isSignatureValid) {
       console.warn('Invalid webhook signature');
-      console.warn('Expected signature:', signature);
-      console.warn('Secret used:', process.env.LEMON_SQUEEZY_WEBHOOK_SECRET ? 'Secret is set' : 'Secret is missing!');
       return res.status(401).json({ error: 'Invalid signature' });
     }
     
     // Parse the body (if it was provided raw)
     const body = req.body || (typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody);
-    const eventName = body.meta?.event_name;
+    const eventType = body.event_type;
     
     // Log the incoming webhook for debugging
-    console.log(`Received Lemon Squeezy webhook: ${eventName}`);
+    console.log(`Received Paddle webhook: ${eventType}`);
     console.log('Webhook data:', JSON.stringify(body, null, 2));
     
-    // Extract user ID from custom data - more thorough search in all possible locations
-    let userId;
-    
-    // Check all possible locations for user_id
-    const possibleLocations = [
-      body.data?.attributes?.custom_data?.user_id,
-      body.data?.attributes?.first_order_item?.custom_data?.user_id,
-      body.meta?.custom_data?.user_id,
-      body.data?.attributes?.custom_data?.userId,
-      body.data?.attributes?.first_order_item?.custom_data?.userId,
-      body.meta?.custom_data?.userId,
-      // Check for checkout URL custom parameters
-      body.data?.attributes?.urls?.checkout_url,
-      // Check inside custom_data if it's a stringified JSON
-      body.data?.attributes?.custom_data,
-      body.meta?.custom_data,
-    ];
-    
-    // Try each location
-    for (const location of possibleLocations) {
-      if (location) {
-        // If it's a URL, try to extract user_id from the query string
-        if (typeof location === 'string' && location.includes('checkout') && location.includes('user_id')) {
-          try {
-            const url = new URL(location);
-            const params = new URLSearchParams(url.search);
-            const customUserIdParam = params.get('checkout[custom][user_id]');
-            if (customUserIdParam) {
-              userId = customUserIdParam;
-              console.log('Extracted user_id from checkout URL:', userId);
-              break;
-            }
-          } catch (e) {
-            console.log('Failed to parse URL:', location);
-          }
-        } 
-        // If it's a stringified JSON object, try to parse it
-        else if (typeof location === 'string' && 
-                (location.includes('{') || location.includes('user_id') || location.includes('userId'))) {
-          try {
-            const parsed = JSON.parse(location);
-            if (parsed.user_id) {
-              userId = parsed.user_id;
-              console.log('Extracted user_id from parsed JSON:', userId);
-              break;
-            } else if (parsed.userId) {
-              userId = parsed.userId;
-              console.log('Extracted userId from parsed JSON:', userId);
-              break;
-            }
-          } catch (e) {
-            // Not a valid JSON, check for url-encoded params
-            if (location.includes('user_id=')) {
-              try {
-                const userIdMatch = location.match(/user_id=([^&]+)/);
-                if (userIdMatch && userIdMatch[1]) {
-                  userId = decodeURIComponent(userIdMatch[1]);
-                  console.log('Extracted user_id from string pattern:', userId);
-                  break;
-                }
-              } catch (e) {
-                console.log('Failed to extract user_id from string pattern');
-              }
-            }
-          }
-        }
-        else {
-          // Direct value
-          userId = location;
-          console.log(`Found user_id in webhook data:`, userId);
-          break;
-        }
-      }
-    }
-    
-    // Final fallback: deep scan of the entire body for user_id
-    if (!userId) {
-      console.log('No user ID found in standard locations, performing deep search...');
-      const bodyStr = JSON.stringify(body);
-      
-      // Try to find user_id in the stringified body
-      let userIdMatch = bodyStr.match(/"user_id":\s*"([^"]+)"/);
-      if (userIdMatch && userIdMatch[1]) {
-        userId = userIdMatch[1];
-        console.log('Found user_id with deep search:', userId);
-      } else {
-        // Try userId variant
-        userIdMatch = bodyStr.match(/"userId":\s*"([^"]+)"/);
-        if (userIdMatch && userIdMatch[1]) {
-          userId = userIdMatch[1];
-          console.log('Found userId with deep search:', userId);
-        }
-      }
-    }
+    // Extract user ID from custom data
+    let userId = body.data?.custom_data?.user_id;
     
     if (!userId) {
-      console.warn('No user ID found in webhook data, dumping full payload:');
-      console.warn(JSON.stringify(body, null, 2));
-      return res.status(200).json({ received: true, status: 'No user ID found' });
-    }
-    
-    // Validate the user ID is a valid MongoDB ID
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      console.warn(`Received invalid user ID format: ${userId}`);
-      return res.status(200).json({ received: true, status: 'Invalid user ID format' });
-    }
-    
-    // Check if user exists
-    const userExists = await User.findById(userId);
-    if (!userExists) {
-      console.warn(`User with ID ${userId} not found in database`);
-      return res.status(200).json({ received: true, status: 'User not found' });
+      console.error('No user ID found in webhook data');
+      return res.status(400).json({ error: 'Missing user ID' });
     }
     
     // Handle different webhook events
-    console.log(`Processing webhook event ${eventName} for user ${userId}`);
-    
-    switch (eventName) {
-      case 'order_created':
-        // When a new order is created
-        console.log(`New order created for user ${userId}`);
+    switch (eventType) {
+      case 'subscription.created':
+        // When a new subscription is created
+        await processSuccessfulPayment(userId, body.data.subscription_id);
+        await sendWelcomeEmail(await User.findById(userId));
+        console.log(`New subscription created for user ${userId}`);
         break;
         
-      case 'subscription_created':
-        // When a subscription is created - complete the registration process
-        try {
-          // Update user record
-          const user = await processSuccessfulPayment(userId, body.data.id);
-          
-          // Send welcome email now that subscription is complete
-          await sendWelcomeEmail(user);
-          
-          // Send receipt email
-          await sendReceiptEmail(user, {
-            orderId: body.data.attributes.order_id || body.data.id
-          });
-          
-          console.log(`Subscription created for user ${userId}, registration completed`);
-        } catch (err) {
-          console.error(`Error processing subscription for user ${userId}:`, err);
-        }
-        break;
-        
-      case 'subscription_cancelled':
-        // When a subscription is cancelled but still active until the end of the billing period
+      case 'subscription.cancelled':
+        // When a subscription is cancelled
         await User.findByIdAndUpdate(userId, { 
-          subscriptionStatus: 'cancelled'
-          // Don't disable quotes yet as user paid for the current period
+          subscriptionStatus: 'cancelled',
+          quotesEnabled: false
         });
         console.log(`Subscription cancelled for user ${userId}`);
         break;
         
-      case 'subscription_expired':
-        // When a subscription has expired after cancellation
+      case 'subscription.updated':
+        // When a subscription is updated
+        const status = body.data.status;
         await User.findByIdAndUpdate(userId, { 
-          isPay: false,
-          subscriptionStatus: 'expired',
-          quotesEnabled: false // Disable quotes when subscription has fully expired
+          subscriptionStatus: status,
+          quotesEnabled: status === 'active'
         });
-        console.log(`Subscription expired for user ${userId}`);
+        console.log(`Subscription updated for user ${userId}`);
         break;
         
-      case 'subscription_paused':
-        // When a subscription is paused
-        await User.findByIdAndUpdate(userId, { 
-          subscriptionStatus: 'paused'
-        });
-        console.log(`Subscription paused for user ${userId}`);
-        break;
-        
-      case 'subscription_unpaused':
-        // When a subscription is resumed after being paused
-        await User.findByIdAndUpdate(userId, { 
-          isPay: true,
-          subscriptionStatus: 'active',
-          quotesEnabled: true
-        });
-        console.log(`Subscription unpaused for user ${userId}`);
-        break;
-        
-      case 'subscription_payment_failed':
-        // When a subscription payment fails
-        await User.findByIdAndUpdate(userId, { 
-          subscriptionStatus: 'payment_failed'
-        });
-        console.log(`Subscription payment failed for user ${userId}`);
-        break;
-        
-      case 'subscription_payment_success':
+      case 'subscription.payment_succeeded':
         // When a subscription payment succeeds
-        await User.findByIdAndUpdate(userId, { 
-          isPay: true,
-          subscriptionStatus: 'active',
-          quotesEnabled: true
-        });
-        
-        // Get user to send receipt
+        await processSuccessfulPayment(userId, body.data.subscription_id);
         const user = await User.findById(userId);
         if (user) {
           await sendReceiptEmail(user, {
-            orderId: body.data.attributes.order_id || body.data.id
+            orderId: body.data.order_id
           });
         }
-        
         console.log(`Subscription payment successful for user ${userId}`);
         break;
         
       default:
-        console.log(`Unhandled webhook event: ${eventName}`);
+        console.log(`Unhandled webhook event: ${eventType}`);
     }
     
-    console.log(`Webhook processed successfully for event: ${eventName}`);
+    console.log(`Webhook processed successfully for event: ${eventType}`);
     return res.status(200).json({ received: true, status: 'processed' });
   } catch (error) {
     console.error('Webhook error:', error);
-    // Include the stack trace for better debugging
     console.error('Error stack:', error.stack);
-    return res.status(200).json({ message: 'Webhook error', error: error.message }); // Return 200 to avoid retries
+    return res.status(200).json({ message: 'Webhook error', error: error.message });
   }
 });
 
@@ -334,47 +168,35 @@ router.get('/status', auth, async (req, res) => {
     let customerPortalUrl = "";
     let cancelSubscriptionUrl = "";
     
-    // If user has a subscription ID, fetch card details and URLs from LemonSqueezy API
+    // If user has a subscription ID, fetch card details and URLs from Paddle API
     if (user.subscriptionId && user.isPay) {
       try {
-        // Make a request to get subscription details from LemonSqueezy
-        const response = await lemonSqueezyApi.get(`/subscriptions/${user.subscriptionId}`);
-        if (response.data && response.data.data) {
-          const subData = response.data.data;
+        const response = await paddleApi.get(`/subscriptions/${user.subscriptionId}`);
+        if (response.data) {
+          const subData = response.data;
           
           // Extract card details
-          cardBrand = subData.attributes?.card_brand || "";
-          cardLastFour = subData.attributes?.card_last_four || "";
+          cardBrand = subData.payment_information?.card_brand || "";
+          cardLastFour = subData.payment_information?.last_four || "";
           
           // Extract URLs from the response
-          if (subData.attributes?.urls) {
-            customerPortalUrl = subData.attributes.urls.customer_portal || "";
-            cancelSubscriptionUrl = subData.attributes.urls.customer_portal || "";
-          }
+          customerPortalUrl = subData.customer_portal_url || "";
+          cancelSubscriptionUrl = subData.cancel_url || "";
         }
       } catch (err) {
         console.error('Error fetching subscription details:', err.message);
-        // Continue even if this fails, we'll just return the data we have
       }
     }
     
-    const responsePayload = {
-      isPay: user.isPay || false,
-      subscriptionStatus: user.subscriptionStatus || 'none',
+    return res.json({
+      isPaid: user.isPay,
+      subscriptionStatus: user.subscriptionStatus,
       subscriptionId: user.subscriptionId,
-      quotesEnabled: user.quotesEnabled || false,
-      paymentUpdatedAt: user.paymentUpdatedAt,
-      // Include payment method details
-      cardBrand: cardBrand,
-      cardLastFour: cardLastFour,
-      // Include subscription management URLs
-      customerPortalUrl: customerPortalUrl,
-      cancelSubscriptionUrl: cancelSubscriptionUrl,
-    };
-    
-    console.log('Returning payment status (FULL):', JSON.stringify(responsePayload, null, 2));
-
-    return res.json(responsePayload);
+      cardBrand,
+      cardLastFour,
+      customerPortalUrl,
+      cancelSubscriptionUrl
+    });
   } catch (error) {
     console.error('Error checking payment status:', error);
     return res.status(500).json({ message: 'Server error' });
@@ -422,7 +244,7 @@ router.get('/debug-checkout', async (req, res) => {
       })(),
       
       // Using the helper function
-      fromHelper: generateLemonCheckoutUrl(testUserId)
+      fromHelper: generateCheckoutUrl(testUserId)
     };
     
     return res.json({
@@ -836,7 +658,7 @@ router.post('/check-subscription', auth, async (req, res) => {
     
     console.log(`Checking subscription ${subscriptionId} for user ${userId}`);
     
-    // Verify the subscription with LemonSqueezy API
+    // Verify the subscription with Paddle API
     const subscriptionData = await verifySubscriptionStatus(subscriptionId);
     
     // Update user status based on subscription state
@@ -858,25 +680,28 @@ router.post('/check-subscription', auth, async (req, res) => {
         subscriptionStatus: 'active'
       });
     } else {
-      console.log(`Subscription ${subscriptionId} is not active (${subscriptionData.status})`);
+      console.log(`Subscription ${subscriptionId} is not active, updating user status`);
       
-      // Update the status to reflect the actual state
       await User.findByIdAndUpdate(userId, {
+        isPay: false,
+        quotesEnabled: false,
         subscriptionStatus: subscriptionData.status,
-        // Only disable premium features if truly expired/cancelled
-        isPay: !['expired', 'cancelled'].includes(subscriptionData.status),
-        quotesEnabled: !['expired', 'cancelled'].includes(subscriptionData.status)
+        paymentUpdatedAt: new Date()
       });
       
-      return res.json({
-        success: true,
-        message: `Subscription status updated to ${subscriptionData.status}`,
+      return res.json({ 
+        success: true, 
+        message: 'Subscription is not active, user status updated',
         subscriptionStatus: subscriptionData.status
       });
     }
   } catch (error) {
     console.error('Error checking subscription:', error);
-    return res.status(500).json({ message: 'Error checking subscription', error: error.message });
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Error checking subscription',
+      error: error.message 
+    });
   }
 });
 
