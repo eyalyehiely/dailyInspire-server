@@ -705,4 +705,29 @@ router.post('/check-subscription', auth, async (req, res) => {
   }
 });
 
+// Test route to verify checkout URL generation
+router.get('/test-checkout-url', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const checkoutUrl = generateCheckoutUrl(userId);
+    
+    // Log the URL for verification
+    console.log('Generated Paddle Checkout URL:', checkoutUrl);
+    
+    res.json({
+      success: true,
+      checkoutUrl,
+      userId,
+      productId: process.env.PADDLE_PRODUCT_ID,
+      appUrl: process.env.APP_URL
+    });
+  } catch (error) {
+    console.error('Error generating test checkout URL:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router; 
