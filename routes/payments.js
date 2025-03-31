@@ -37,17 +37,16 @@ router.get('/checkout-info', auth, async (req, res) => {
       });
     }
     
-    // Generate direct checkout URL
-    const directCheckoutUrl = generateCheckoutUrl(req.user.id);
-    console.log("Generated checkout URL with user ID:", req.user.id);
-    console.log("Full checkout URL:", directCheckoutUrl);
+    // Generate client-side token
+    const clientToken = await generateClientToken(req.user.id);
+    console.log("Generated client token for user:", req.user.id);
     
     // Return Paddle checkout information
     const responseData = {
       isPaid: false,
       productId: process.env.PADDLE_PRODUCT_ID,
       userId: req.user.id,
-      directCheckoutUrl,
+      clientToken,
       subscriptionStatus: user.subscriptionStatus || 'none',
       subscriptionId: user.subscriptionId || null
     };
@@ -55,8 +54,8 @@ router.get('/checkout-info', auth, async (req, res) => {
     console.log("Sending checkout info to client:", responseData);
     return res.json(responseData);
   } catch (error) {
-    console.error('Error getting checkout info:', error);
-    return res.status(500).json({ message: 'Server error' });
+    console.error('Error in checkout-info route:', error);
+    return res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 

@@ -167,6 +167,32 @@ const verifySubscriptionStatus = async (subscriptionId) => {
   }
 };
 
+// Generate a client-side token for Paddle checkout
+const generateClientToken = async (userId) => {
+  if (!userId) {
+    throw new Error('Missing userId when generating client token');
+  }
+
+  try {
+    const response = await paddleApi.post('/checkout/tokens', {
+      items: [{
+        price_id: process.env.PADDLE_PRODUCT_ID,
+        quantity: 1
+      }],
+      custom_data: {
+        user_id: userId
+      },
+      success_url: `${process.env.APP_URL}/payment-success`,
+      cancel_url: `${process.env.APP_URL}/payment`
+    });
+
+    return response.data.token;
+  } catch (error) {
+    console.error('Error generating client token:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   paddleApi,
   verifyWebhookSignature,
@@ -174,5 +200,6 @@ module.exports = {
   sendReceiptEmail,
   getUserPaymentStatus,
   generateCheckoutUrl,
-  verifySubscriptionStatus
+  verifySubscriptionStatus,
+  generateClientToken
 }; 
