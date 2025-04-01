@@ -60,6 +60,7 @@ router.post('/webhook', async (req, res) => {
   try {
     console.log('===== WEBHOOK RECEIVED =====');
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('Body:', JSON.stringify(req.body, null, 2));
     
     // Verify webhook signature from Paddle
     const signature = req.headers['x-paddle-signature'];
@@ -92,7 +93,18 @@ router.post('/webhook', async (req, res) => {
     
     if (!userId) {
       console.error('No user ID found in webhook data');
-      return res.status(400).json({ error: 'Missing user ID' });
+      // Try to find user by email if available
+      if (body.data?.customer?.email) {
+        console.log('Attempting to find user by email:', body.data.customer.email);
+        const user = await User.findOne({ email: body.data.customer.email });
+        if (user) {
+          userId = user._id.toString();
+          console.log('Found user by email:', userId);
+        }
+      }
+      if (!userId) {
+        return res.status(400).json({ error: 'Could not identify user' });
+      }
     }
     
     // Handle different webhook events
@@ -138,6 +150,15 @@ router.post('/webhook', async (req, res) => {
       default:
         console.log(`Unhandled webhook event: ${eventType}`);
     }
+    
+    // Verify the update was successful
+    const updatedUser = await User.findById(userId);
+    console.log('Updated user status:', {
+      email: updatedUser.email,
+      isPay: updatedUser.isPay,
+      subscriptionStatus: updatedUser.subscriptionStatus,
+      quotesEnabled: updatedUser.quotesEnabled
+    });
     
     console.log(`Webhook processed successfully for event: ${eventType}`);
     return res.status(200).json({ received: true, status: 'processed' });
@@ -200,60 +221,10 @@ router.get('/status', auth, async (req, res) => {
 });
 
 // Route for testing lemon squeezy configuration
-router.get('/test-lemon-config', async (req, res) => {
-  try {
-    const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID || '9e44dcc7-edab-43f0-b9a2-9d663d4af336';
-    const checkoutUrl = `https://dailyinspire.lemonsqueezy.com/buy/${variantId}`;
-    
-    return res.json({
-      message: 'Lemon Squeezy configuration',
-      variantId: variantId,
-      checkoutUrl: checkoutUrl,
-      sampleUrlWithUserId: `${checkoutUrl}?checkout[custom][user_id]=test-user-id&discount=0`
-    });
-  } catch (error) {
-    console.error('Error in test endpoint:', error);
-    return res.status(500).json({ message: 'Server error' });
-  }
-});
+
 
 // Debug endpoint for testing checkout URLs
-router.get('/debug-checkout', async (req, res) => {
-  try {
-    const testUserId = 'test-user-123';
-    const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID || '9e44dcc7-edab-43f0-b9a2-9d663d4af336';
-    
-    // Create URLs with different formats for testing
-    const urls = {
-      // Store-specific domain format (based on actual URL pattern)
-      storeSpecific: `https://dailyinspire.lemonsqueezy.com/buy/${variantId}?checkout[custom][user_id]=${testUserId}&discount=0`,
-      
-      // With encoded brackets
-      encoded: `https://dailyinspire.lemonsqueezy.com/buy/${variantId}?checkout%5Bcustom%5D%5Buser_id%5D=${testUserId}&discount=0`,
-      
-      // Using searchParams
-      withSearchParams: (() => {
-        const url = new URL(`https://dailyinspire.lemonsqueezy.com/buy/${variantId}`);
-        url.searchParams.append('checkout[custom][user_id]', testUserId);
-        url.searchParams.append('discount', '0');
-        return url.toString();
-      })(),
-      
-      // Using the helper function
-      fromHelper: generateCheckoutUrl(testUserId)
-    };
-    
-    return res.json({
-      message: 'Debug checkout URLs',
-      userId: testUserId,
-      variantId: variantId,
-      urls
-    });
-  } catch (error) {
-    console.error('Error in debug endpoint:', error);
-    return res.status(500).json({ message: 'Server error' });
-  }
-});
+
 
 // Raw webhook debug endpoint - logs all incoming webhook data without verification
 router.post('/webhook-debug', async (req, res) => {

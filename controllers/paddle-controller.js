@@ -34,26 +34,80 @@ const verifyWebhookSignature = (signature, body) => {
 // Process successful payment
 const processSuccessfulPayment = async (userId, subscriptionId) => {
   try {
+    console.log(`Processing payment for user: ${userId}`);
+    console.log(`Subscription ID: ${subscriptionId || 'unknown'}`);
+    
+    if (!userId) {
+      throw new Error('Missing user ID');
+    }
+    
+    // Validate the user ID is a valid MongoDB ID
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new Error(`Invalid user ID format: ${userId}`);
+    }
+    
+    // Find user first to verify they exist
+    const existingUser = await User.findById(userId);
+    if (!existingUser) {
+      throw new Error(`User not found with ID: ${userId}`);
+    }
+    
+    console.log(`Found user: ${existingUser.email}`);
+    console.log('Current user status:', {
+      isPay: existingUser.isPay,
+      subscriptionStatus: existingUser.subscriptionStatus,
+      quotesEnabled: existingUser.quotesEnabled
+    });
+    
+    // Update user payment status and complete registration
+    const updateData = {
+      isPay: true,
+      isRegistrationComplete: true,
+      quotesEnabled: true,
+      subscriptionId: subscriptionId || existingUser.subscriptionId || 'unknown',
+      subscriptionStatus: 'active',
+      paymentUpdatedAt: new Date(),
+      // Preserve existing user data
+      first_name: existingUser.first_name,
+      last_name: existingUser.last_name,
+      email: existingUser.email,
+      preferredTime: existingUser.preferredTime || '09:00'
+    };
+    
+    console.log('Updating user with data:', updateData);
+    
     const user = await User.findByIdAndUpdate(
       userId,
-      {
-        isPay: true,
-        isRegistrationComplete: true,
-        quotesEnabled: true,
-        subscriptionStatus: 'active',
-        subscriptionId: subscriptionId,
-        paymentUpdatedAt: new Date()
-      },
+      updateData,
       { new: true }
     );
-
+    
+    // Verify the update was successful
     if (!user) {
-      throw new Error('User not found');
+      throw new Error(`Failed to update user: ${userId}`);
     }
-
+    
+    // Verify the payment status was updated
+    if (!user.isPay) {
+      throw new Error(`Payment status not updated for user: ${userId}`);
+    }
+    
+    console.log(`Payment processed successfully for user: ${userId}`);
+    console.log(`Updated user data:`, {
+      email: user.email,
+      isPay: user.isPay,
+      subscriptionStatus: user.subscriptionStatus,
+      quotesEnabled: user.quotesEnabled,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      preferredTime: user.preferredTime
+    });
+    
     return user;
   } catch (error) {
-    console.error('Error processing payment:', error);
+    console.error(`Error processing payment for user ${userId}:`, error);
+    console.error('Error stack:', error.stack);
     throw error;
   }
 };
