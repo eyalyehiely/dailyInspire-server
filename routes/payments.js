@@ -106,39 +106,74 @@ router.post('/webhook', async (req, res) => {
     console.log(`Received Paddle webhook: ${eventType}`);
     console.log('Webhook data:', JSON.stringify(body, null, 2));
     
-    // Extract user ID from custom data
-    let userId = body.data?.custom_data?.user_id;
+    // Extract user ID from custom data or find by email
+    let userId = null;
+    
+    // Try to get user ID from custom data first
+    if (body.data?.custom_data?.user_id) {
+      userId = body.data.custom_data.user_id;
+    }
+    
+    // If no user ID in custom data, try to find by email
+    if (!userId && body.data?.customer?.email) {
+      console.log('Attempting to find user by email:', body.data.customer.email);
+      const user = await User.findOne({ email: body.data.customer.email });
+      if (user) {
+        userId = user._id.toString();
+        console.log('Found user by email:', userId);
+      }
+    }
     
     if (!userId) {
       console.error('No user ID found in webhook data');
-      // Try to find user by email if available
-      if (body.data?.customer?.email) {
-        console.log('Attempting to find user by email:', body.data.customer.email);
-        const user = await User.findOne({ email: body.data.customer.email });
-        if (user) {
-          userId = user._id.toString();
-          console.log('Found user by email:', userId);
-        }
-      }
-      if (!userId) {
-        return res.status(400).json({ error: 'Could not identify user' });
-      }
+      return res.status(400).json({ error: 'Could not identify user' });
     }
     
     // Handle different webhook events
     switch (eventType) {
       case 'subscription.created':
-        // When a new subscription is created
-        await processSuccessfulPayment(userId, body.data.subscription_id);
-        await sendWelcomeEmail(await User.findById(userId));
-        console.log(`New subscription created for user ${userId}`);
+      case 'subscription.payment_succeeded':
+        // When a new subscription is created or payment succeeds
+        console.log(`Processing ${eventType} for user ${userId}`);
+        const subscriptionId = body.data.subscription_id;
+        
+        if (!subscriptionId) {
+          console.error('Missing subscription ID in webhook data');
+          return res.status(400).json({ error: 'Missing subscription ID' });
+        }
+        
+        // Validate subscription ID format
+        if (typeof subscriptionId !== 'string' || subscriptionId.trim().length === 0) {
+          console.error('Invalid subscription ID format:', subscriptionId);
+          return res.status(400).json({ error: 'Invalid subscription ID format' });
+        }
+        
+        // Process the payment
+        const updatedUser = await processSuccessfulPayment(userId, subscriptionId);
+        console.log('User updated after payment:', {
+          email: updatedUser.email,
+          isPay: updatedUser.isPay,
+          subscriptionStatus: updatedUser.subscriptionStatus,
+          subscriptionId: updatedUser.subscriptionId
+        });
+        
+        // Send welcome email for new subscriptions
+        if (eventType === 'subscription.created') {
+          await sendWelcomeEmail(updatedUser);
+        }
+        
+        // Send receipt email
+        await sendReceiptEmail(updatedUser, {
+          orderId: body.data.order_id
+        });
         break;
         
       case 'subscription.cancelled':
         // When a subscription is cancelled
         await User.findByIdAndUpdate(userId, { 
           subscriptionStatus: 'cancelled',
-          quotesEnabled: false
+          quotesEnabled: false,
+          isPay: false
         });
         console.log(`Subscription cancelled for user ${userId}`);
         break;
@@ -148,21 +183,10 @@ router.post('/webhook', async (req, res) => {
         const status = body.data.status;
         await User.findByIdAndUpdate(userId, { 
           subscriptionStatus: status,
-          quotesEnabled: status === 'active'
+          quotesEnabled: status === 'active',
+          isPay: status === 'active'
         });
         console.log(`Subscription updated for user ${userId}`);
-        break;
-        
-      case 'subscription.payment_succeeded':
-        // When a subscription payment succeeds
-        await processSuccessfulPayment(userId, body.data.subscription_id);
-        const user = await User.findById(userId);
-        if (user) {
-          await sendReceiptEmail(user, {
-            orderId: body.data.order_id
-          });
-        }
-        console.log(`Subscription payment successful for user ${userId}`);
         break;
         
       default:
@@ -170,12 +194,13 @@ router.post('/webhook', async (req, res) => {
     }
     
     // Verify the update was successful
-    const updatedUser = await User.findById(userId);
-    console.log('Updated user status:', {
-      email: updatedUser.email,
-      isPay: updatedUser.isPay,
-      subscriptionStatus: updatedUser.subscriptionStatus,
-      quotesEnabled: updatedUser.quotesEnabled
+    const finalUser = await User.findById(userId);
+    console.log('Final user status:', {
+      email: finalUser.email,
+      isPay: finalUser.isPay,
+      subscriptionStatus: finalUser.subscriptionStatus,
+      quotesEnabled: finalUser.quotesEnabled,
+      subscriptionId: finalUser.subscriptionId
     });
     
     console.log(`Webhook processed successfully for event: ${eventType}`);
