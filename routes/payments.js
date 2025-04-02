@@ -162,27 +162,20 @@ router.post('/webhook', async (req, res) => {
     if (body.data?.custom_data?.user_id) {
       userId = body.data.custom_data.user_id;
       console.log('Found user ID in custom data:', userId);
-    } else if (body.data?.customer?.custom_data?.user_id) {
-      userId = body.data.customer.custom_data.user_id;
-      console.log('Found user ID in customer custom data:', userId);
     }
     
     // If no user ID in custom data, try to find by email
-    if (!userId && body.data?.customer?.email) {
-      console.log('Attempting to find user by email:', body.data.customer.email);
-      const user = await User.findOne({ email: body.data.customer.email });
+    if (!userId && body.data?.customer_email) {
+      const user = await User.findOne({ email: body.data.customer_email });
       if (user) {
-        userId = user._id.toString();
+        userId = user._id;
         console.log('Found user by email:', userId);
-      } else {
-        console.error('No user found with email:', body.data.customer.email);
-        return res.status(404).json({ error: 'User not found with provided email' });
       }
     }
     
     if (!userId) {
-      console.error('No user ID found in webhook data. Full webhook body:', JSON.stringify(body, null, 2));
-      return res.status(400).json({ error: 'Could not identify user' });
+      console.error('Could not find user ID from webhook data');
+      return res.status(400).json({ error: 'Could not find user ID' });
     }
     
     // Handle different webhook events
@@ -209,42 +202,22 @@ router.post('/webhook', async (req, res) => {
         try {
           // Process the payment
           const updatedUser = await processSuccessfulPayment(userId, subscriptionId);
-          console.log('User updated after payment:', {
-            email: updatedUser.email,
-            isPay: updatedUser.isPay,
-            subscriptionStatus: updatedUser.subscriptionStatus,
-            subscriptionId: updatedUser.subscriptionId,
-            quotesEnabled: updatedUser.quotesEnabled
-          });
           
-          // Send welcome email for new subscriptions
+          // Send welcome email if this is a new subscription
           if (eventType === 'subscription.created') {
-            console.log('Sending welcome email for new subscription');
             await sendWelcomeEmail(updatedUser);
           }
           
           // Send receipt email
-          console.log('Sending receipt email');
           await sendReceiptEmail(updatedUser, {
-            orderId: body.data.order_id
+            orderId: subscriptionId
           });
           
-          return res.status(200).json({ 
-            success: true, 
-            message: 'Payment processed successfully',
-            user: {
-              id: updatedUser._id,
-              email: updatedUser.email,
-              isPay: updatedUser.isPay,
-              subscriptionStatus: updatedUser.subscriptionStatus
-            }
-          });
+          console.log(`Successfully processed payment for user: ${updatedUser.email}`);
+          return res.status(200).json({ success: true });
         } catch (error) {
           console.error('Error processing payment:', error);
-          return res.status(500).json({ 
-            error: 'Failed to process payment',
-            details: error.message
-          });
+          return res.status(500).json({ error: error.message });
         }
         
       case 'subscription.cancelled':
