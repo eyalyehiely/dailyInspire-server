@@ -313,25 +313,64 @@ router.get('/status', auth, async (req, res) => {
     let customerPortalUrl = "";
     let cancelSubscriptionUrl = "";
     let subscriptionDetails = null;
+    let paddleError = null;
     
     // If user has a subscription ID, fetch card details and URLs from Paddle API
-    if (user.subscriptionId && user.isPay) {
+    if (user.subscriptionId) {
       try {
         const response = await paddleApi.get(`/subscriptions/${user.subscriptionId}`);
-        if (response.data) {
-          const subData = response.data;
+        
+        // Check if response follows Paddle's API format
+        if (response.data && response.data.data) {
+          const subData = response.data.data;
           subscriptionDetails = subData;
           
-          // Extract card details
-          cardBrand = subData.payment_information?.card_brand || "";
-          cardLastFour = subData.payment_information?.last_four || "";
+          // Extract card details from payment information
+          if (subData.payment_information) {
+            cardBrand = subData.payment_information.card_brand || "";
+            cardLastFour = subData.payment_information.last_four || "";
+          }
           
           // Extract URLs from the response
           customerPortalUrl = subData.customer_portal_url || "";
           cancelSubscriptionUrl = subData.cancel_url || "";
+          
+          // Update user's payment status based on Paddle's status
+          const paddleStatus = subData.status;
+          if (paddleStatus !== user.subscriptionStatus) {
+            await User.findByIdAndUpdate(req.user.id, {
+              subscriptionStatus: paddleStatus,
+              isPay: paddleStatus === 'active',
+              quotesEnabled: paddleStatus === 'active'
+            });
+            user.subscriptionStatus = paddleStatus;
+            user.isPay = paddleStatus === 'active';
+            user.quotesEnabled = paddleStatus === 'active';
+          }
+        } else {
+          console.error('Invalid Paddle API response format:', response.data);
+          paddleError = 'Invalid response from payment system';
         }
       } catch (err) {
         console.error('Error fetching subscription details:', err.message);
+        paddleError = err.message;
+        
+        // If the subscription is not found in Paddle, mark the user as unpaid
+        if (err.response?.status === 404) {
+          await User.findByIdAndUpdate(req.user.id, {
+            isPay: false,
+            subscriptionStatus: 'none',
+            quotesEnabled: false
+          });
+          return res.json({
+            isPay: false,
+            isRegistrationComplete: user.isRegistrationComplete,
+            quotesEnabled: false,
+            subscriptionStatus: 'none',
+            subscriptionId: null,
+            error: 'Subscription not found in payment system'
+          });
+        }
       }
     }
     
@@ -346,11 +385,16 @@ router.get('/status', auth, async (req, res) => {
       customerPortalUrl,
       cancelSubscriptionUrl,
       subscriptionDetails,
-      paymentUpdatedAt: user.paymentUpdatedAt
+      paymentUpdatedAt: user.paymentUpdatedAt,
+      error: paddleError
     });
   } catch (error) {
     console.error('Error checking payment status:', error);
-    return res.status(500).json({ message: 'Server error' });
+    return res.status(500).json({ 
+      message: 'Server error',
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
