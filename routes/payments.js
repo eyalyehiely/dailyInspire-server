@@ -113,29 +113,43 @@ router.post('/webhook', async (req, res) => {
   try {
     console.log('===== WEBHOOK RECEIVED =====');
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
-    console.log('Body:', JSON.stringify(req.body, null, 2));
     
     // Verify webhook signature from Paddle
     const signature = req.headers['x-paddle-signature'];
     if (!signature) {
-      console.warn('Missing webhook signature');
+      console.error('Missing webhook signature');
       return res.status(401).json({ error: 'Missing signature' });
     }
     
-    // Important: We need the raw body string for signature verification
-    const rawBody = req.rawBody || JSON.stringify(req.body);
+    // Get the raw body string - this should be available from body-parser raw
+    const rawBody = req.rawBody;
+    if (!rawBody) {
+      console.error('Raw body not available - body-parser raw middleware may not be configured');
+      return res.status(400).json({ error: 'Raw body not available' });
+    }
     
     // Verify the signature with the raw body
     const isSignatureValid = verifyWebhookSignature(signature, rawBody);
     
     if (!isSignatureValid) {
-      console.warn('Invalid webhook signature');
+      console.error('Invalid webhook signature');
       return res.status(401).json({ error: 'Invalid signature' });
     }
     
-    // Parse the body (if it was provided raw)
-    const body = req.body || (typeof rawBody === 'string' ? JSON.parse(rawBody) : rawBody);
+    // Parse the body
+    let body;
+    try {
+      body = JSON.parse(rawBody);
+    } catch (error) {
+      console.error('Failed to parse webhook body:', error);
+      return res.status(400).json({ error: 'Invalid JSON body' });
+    }
+    
     const eventType = body.event_type;
+    if (!eventType) {
+      console.error('Missing event_type in webhook body');
+      return res.status(400).json({ error: 'Missing event_type' });
+    }
     
     // Log the incoming webhook for debugging
     console.log(`Received Paddle webhook: ${eventType}`);
@@ -161,7 +175,8 @@ router.post('/webhook', async (req, res) => {
         userId = user._id.toString();
         console.log('Found user by email:', userId);
       } else {
-        console.log('No user found with email:', body.data.customer.email);
+        console.error('No user found with email:', body.data.customer.email);
+        return res.status(404).json({ error: 'User not found with provided email' });
       }
     }
     
@@ -191,28 +206,46 @@ router.post('/webhook', async (req, res) => {
         
         console.log('Processing payment with subscription ID:', subscriptionId);
         
-        // Process the payment
-        const updatedUser = await processSuccessfulPayment(userId, subscriptionId);
-        console.log('User updated after payment:', {
-          email: updatedUser.email,
-          isPay: updatedUser.isPay,
-          subscriptionStatus: updatedUser.subscriptionStatus,
-          subscriptionId: updatedUser.subscriptionId,
-          quotesEnabled: updatedUser.quotesEnabled
-        });
-        
-        // Send welcome email for new subscriptions
-        if (eventType === 'subscription.created') {
-          console.log('Sending welcome email for new subscription');
-          await sendWelcomeEmail(updatedUser);
+        try {
+          // Process the payment
+          const updatedUser = await processSuccessfulPayment(userId, subscriptionId);
+          console.log('User updated after payment:', {
+            email: updatedUser.email,
+            isPay: updatedUser.isPay,
+            subscriptionStatus: updatedUser.subscriptionStatus,
+            subscriptionId: updatedUser.subscriptionId,
+            quotesEnabled: updatedUser.quotesEnabled
+          });
+          
+          // Send welcome email for new subscriptions
+          if (eventType === 'subscription.created') {
+            console.log('Sending welcome email for new subscription');
+            await sendWelcomeEmail(updatedUser);
+          }
+          
+          // Send receipt email
+          console.log('Sending receipt email');
+          await sendReceiptEmail(updatedUser, {
+            orderId: body.data.order_id
+          });
+          
+          return res.status(200).json({ 
+            success: true, 
+            message: 'Payment processed successfully',
+            user: {
+              id: updatedUser._id,
+              email: updatedUser.email,
+              isPay: updatedUser.isPay,
+              subscriptionStatus: updatedUser.subscriptionStatus
+            }
+          });
+        } catch (error) {
+          console.error('Error processing payment:', error);
+          return res.status(500).json({ 
+            error: 'Failed to process payment',
+            details: error.message
+          });
         }
-        
-        // Send receipt email
-        console.log('Sending receipt email');
-        await sendReceiptEmail(updatedUser, {
-          orderId: body.data.order_id
-        });
-        break;
         
       case 'subscription.cancelled':
         // When a subscription is cancelled

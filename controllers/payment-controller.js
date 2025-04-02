@@ -30,34 +30,28 @@ const verifyWebhookSignature = (signature, body) => {
     console.error('⚠️ LEMON_SQUEEZY_WEBHOOK_SECRET is not set in environment variables');
     return false;
   }
-  
+
   try {
-    // The key issue is here - LemonSqueezy signs the raw string body, not the parsed JSON
-    // Make sure we're working with the raw string version
-    const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
-    
-    // Create HMAC using the webhook secret
+    // Create HMAC with SHA256
     const hmac = crypto.createHmac('sha256', process.env.LEMON_SQUEEZY_WEBHOOK_SECRET);
-    const calculatedSignature = hmac.update(bodyString).digest('hex');
     
-    console.log('Calculated signature:', calculatedSignature);
-    console.log('Received signature:', signature);
-    console.log('Secret used (length):', process.env.LEMON_SQUEEZY_WEBHOOK_SECRET?.length || 'missing');
+    // Update with the raw body
+    hmac.update(body);
     
-    // Check for exact match first
-    const isExactMatch = calculatedSignature === signature;
+    // Get the calculated signature
+    const calculatedSignature = hmac.digest('hex');
     
-    // If no exact match, try trimmed versions
-    const isTrimmedMatch = calculatedSignature.trim() === signature.trim();
+    // Compare signatures
+    const isValid = crypto.timingSafeEqual(
+      Buffer.from(signature),
+      Buffer.from(calculatedSignature)
+    );
     
-    console.log('Exact signature match:', isExactMatch);
-    console.log('Trimmed signature match:', isTrimmedMatch);
-    
-    // If either matches, consider it valid
-    return isExactMatch || isTrimmedMatch;
+    console.log('Signature verification result:', isValid);
+    return isValid;
   } catch (error) {
     console.error('Error verifying webhook signature:', error);
-    return false; // Reject if there's an error in verification
+    return false;
   }
 };
 
