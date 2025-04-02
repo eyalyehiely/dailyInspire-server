@@ -45,7 +45,7 @@ router.get('/checkout-info', auth, async (req, res) => {
       
       // Get additional subscription details from Paddle if available
       let subscriptionDetails = null;
-      let cardBrand = "";
+      // let cardBrand = "";
       let cardLastFour = "";
       let customerPortalUrl = "";
       let cancelSubscriptionUrl = "";
