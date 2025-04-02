@@ -732,6 +732,18 @@ router.get('/verify-subscription', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
+    // If user has no subscription ID, they haven't subscribed yet
+    if (!user.subscriptionId) {
+      return res.json({
+        success: true,
+        isPay: false,
+        isRegistrationComplete: false,
+        quotesEnabled: false,
+        subscriptionStatus: 'none',
+        message: 'No active subscription'
+      });
+    }
+    
     // Check subscription status with payment provider
     const subscriptionData = await verifySubscriptionStatus(user.subscriptionId);
     

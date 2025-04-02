@@ -192,7 +192,12 @@ const generateCheckoutUrl = (userId) => {
 // Verify a subscription status directly with the Paddle API
 const verifySubscriptionStatus = async (subscriptionId) => {
   if (!subscriptionId) {
-    throw new Error('Missing subscription ID');
+    return {
+      id: null,
+      status: 'none',
+      isActive: false,
+      customData: {}
+    };
   }
 
   if (!process.env.PADDLE_API_KEY) {
@@ -203,7 +208,12 @@ const verifySubscriptionStatus = async (subscriptionId) => {
     const response = await paddleApi.get(`/subscriptions/${subscriptionId}`);
     
     if (!response || !response.data) {
-      throw new Error('Invalid response from Paddle API');
+      return {
+        id: subscriptionId,
+        status: 'not_found',
+        isActive: false,
+        customData: {}
+      };
     }
 
     const subscriptionData = response.data;
@@ -217,7 +227,12 @@ const verifySubscriptionStatus = async (subscriptionId) => {
     };
   } catch (error) {
     console.error(`Error verifying subscription status with Paddle API: ${error.message}`);
-    throw error;
+    return {
+      id: subscriptionId,
+      status: 'error',
+      isActive: false,
+      customData: {}
+    };
   }
 };
 
