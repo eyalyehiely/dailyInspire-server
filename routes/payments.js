@@ -184,6 +184,7 @@ router.get('/status', auth, async (req, res) => {
     let cardLastFour = "";
     let customerPortalUrl = "";
     let cancelSubscriptionUrl = "";
+    let subscriptionDetails = null;
     
     // If user has a subscription ID, fetch card details and URLs from Paddle API
     if (user.subscriptionId && user.isPay) {
@@ -191,6 +192,7 @@ router.get('/status', auth, async (req, res) => {
         const response = await paddleApi.get(`/subscriptions/${user.subscriptionId}`);
         if (response.data) {
           const subData = response.data;
+          subscriptionDetails = subData;
           
           // Extract card details
           cardBrand = subData.payment_information?.card_brand || "";
@@ -206,13 +208,17 @@ router.get('/status', auth, async (req, res) => {
     }
     
     return res.json({
-      isPaid: user.isPay,
+      isPay: user.isPay,
+      isRegistrationComplete: user.isRegistrationComplete,
+      quotesEnabled: user.quotesEnabled,
       subscriptionStatus: user.subscriptionStatus,
       subscriptionId: user.subscriptionId,
       cardBrand,
       cardLastFour,
       customerPortalUrl,
-      cancelSubscriptionUrl
+      cancelSubscriptionUrl,
+      subscriptionDetails,
+      paymentUpdatedAt: user.paymentUpdatedAt
     });
   } catch (error) {
     console.error('Error checking payment status:', error);
