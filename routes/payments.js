@@ -889,4 +889,70 @@ router.get('/verify-subscription', auth, async (req, res) => {
   }
 });
 
+// Route to update user data after payment
+router.post('/update-user-data', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { subscriptionId, subscriptionStatus } = req.body;
+    
+    console.log(`Updating user data for user ${userId}`);
+    console.log('Subscription data:', { subscriptionId, subscriptionStatus });
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing user ID' });
+    }
+    
+    // Find user first to verify they exist
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Update user data
+    const updateData = {
+      isPay: true,
+      isRegistrationComplete: true,
+      quotesEnabled: true,
+      subscriptionStatus: subscriptionStatus || 'active',
+      paymentUpdatedAt: new Date()
+    };
+    
+    // Only update subscriptionId if it's provided
+    if (subscriptionId) {
+      updateData.subscriptionId = subscriptionId;
+    }
+    
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $set: updateData },
+      { new: true }
+    );
+    
+    if (!updatedUser) {
+      throw new Error('Failed to update user');
+    }
+    
+    console.log('User updated successfully:', {
+      id: updatedUser._id,
+      email: updatedUser.email,
+      isPay: updatedUser.isPay,
+      subscriptionStatus: updatedUser.subscriptionStatus
+    });
+    
+    return res.json({
+      success: true,
+      user: {
+        id: updatedUser._id,
+        email: updatedUser.email,
+        isPay: updatedUser.isPay,
+        subscriptionStatus: updatedUser.subscriptionStatus,
+        quotesEnabled: updatedUser.quotesEnabled
+      }
+    });
+  } catch (error) {
+    console.error('Error updating user data:', error);
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router; 
