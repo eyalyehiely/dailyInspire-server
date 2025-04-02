@@ -29,8 +29,6 @@ router.get('/checkout-info', auth, async (req, res) => {
       });
     }
     
-    console.log('PADDLE_PRODUCT_ID from env:', process.env.PADDLE_PRODUCT_ID);
-    
     // Check if user is already paid
     const user = await User.findById(req.user.id);
     if (!user) {
@@ -41,24 +39,61 @@ router.get('/checkout-info', auth, async (req, res) => {
       });
     }
     
-    // If user already has paid status, return that info
+    // If user already has paid status, return comprehensive subscription info
     if (user.isPay) {
       console.log('User already has premium access:', req.user.id);
+      
+      // Get additional subscription details from Paddle if available
+      let subscriptionDetails = null;
+      let cardBrand = "";
+      let cardLastFour = "";
+      let customerPortalUrl = "";
+      let cancelSubscriptionUrl = "";
+      
+      if (user.subscriptionId) {
+        try {
+          const response = await paddleApi.get(`/subscriptions/${user.subscriptionId}`);
+          if (response.data) {
+            const subData = response.data;
+            subscriptionDetails = subData;
+            
+            // Extract card details
+            cardBrand = subData.payment_information?.card_brand || "";
+            cardLastFour = subData.payment_information?.last_four || "";
+            
+            // Extract URLs from the response
+            customerPortalUrl = subData.customer_portal_url || "";
+            cancelSubscriptionUrl = subData.cancel_url || "";
+          }
+        } catch (err) {
+          console.error('Error fetching subscription details:', err.message);
+        }
+      }
+      
       return res.json({ 
         isPaid: true, 
         message: 'You already have premium access',
         subscriptionStatus: user.subscriptionStatus || 'active',
-        subscriptionId: user.subscriptionId || null
+        subscriptionId: user.subscriptionId || null,
+        cardBrand,
+        cardLastFour,
+        customerPortalUrl,
+        cancelSubscriptionUrl,
+        subscriptionDetails,
+        paymentUpdatedAt: user.paymentUpdatedAt,
+        quotesEnabled: user.quotesEnabled
       });
     }
     
-    // Return Paddle checkout information
+    // Return Paddle checkout information for non-paid users
     const responseData = {
       isPaid: false,
       productId: process.env.PADDLE_PRODUCT_ID,
       userId: req.user.id,
       subscriptionStatus: user.subscriptionStatus || 'none',
-      subscriptionId: user.subscriptionId || null
+      subscriptionId: user.subscriptionId || null,
+      quotesEnabled: user.quotesEnabled || false,
+      paymentUpdatedAt: user.paymentUpdatedAt || null
     };
     
     console.log("Sending checkout info to client:", responseData);
