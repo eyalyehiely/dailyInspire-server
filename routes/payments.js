@@ -697,4 +697,62 @@ router.get('/test-checkout-url', auth, async (req, res) => {
   }
 });
 
+// Add new endpoint to verify subscription status
+router.get('/verify-subscription', auth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get user with latest data
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Check subscription status with payment provider
+    const subscriptionData = await verifySubscriptionStatus(user.subscriptionId);
+    
+    // Update user status based on subscription state
+    if (subscriptionData.isActive) {
+      await User.findByIdAndUpdate(userId, {
+        isPay: true,
+        isRegistrationComplete: true,
+        quotesEnabled: true,
+        subscriptionStatus: 'active',
+        paymentUpdatedAt: new Date()
+      });
+      
+      return res.json({
+        success: true,
+        isPay: true,
+        isRegistrationComplete: true,
+        quotesEnabled: true,
+        subscriptionStatus: 'active',
+        message: 'Subscription is active'
+      });
+    } else {
+      await User.findByIdAndUpdate(userId, {
+        isPay: false,
+        quotesEnabled: false,
+        subscriptionStatus: subscriptionData.status,
+        paymentUpdatedAt: new Date()
+      });
+      
+      return res.json({
+        success: true,
+        isPay: false,
+        isRegistrationComplete: false,
+        quotesEnabled: false,
+        subscriptionStatus: subscriptionData.status,
+        message: 'Subscription is not active'
+      });
+    }
+  } catch (error) {
+    console.error('Error verifying subscription:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Error verifying subscription status' 
+    });
+  }
+});
+
 module.exports = router; 
