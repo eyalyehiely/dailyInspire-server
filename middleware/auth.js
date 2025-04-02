@@ -4,7 +4,7 @@ const User = require('../models/User');
 const auth = async (req, res, next) => {
   try {
     // Log the request headers for debugging
-    console.log('Auth middleware: Headers received:', JSON.stringify(req.headers));
+    // console.log('Auth middleware: Headers received:', JSON.stringify(req.headers));
     
     // Get token from header
     const token = req.header('Authorization')?.replace('Bearer ', '');

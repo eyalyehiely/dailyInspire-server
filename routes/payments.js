@@ -147,6 +147,7 @@ router.post('/webhook', async (req, res) => {
     // Try to get user ID from custom data first
     if (body.data?.custom_data?.user_id) {
       userId = body.data.custom_data.user_id;
+      console.log('Found user ID in custom data:', userId);
     }
     
     // If no user ID in custom data, try to find by email
@@ -183,21 +184,26 @@ router.post('/webhook', async (req, res) => {
           return res.status(400).json({ error: 'Invalid subscription ID format' });
         }
         
+        console.log('Processing payment with subscription ID:', subscriptionId);
+        
         // Process the payment
         const updatedUser = await processSuccessfulPayment(userId, subscriptionId);
         console.log('User updated after payment:', {
           email: updatedUser.email,
           isPay: updatedUser.isPay,
           subscriptionStatus: updatedUser.subscriptionStatus,
-          subscriptionId: updatedUser.subscriptionId
+          subscriptionId: updatedUser.subscriptionId,
+          quotesEnabled: updatedUser.quotesEnabled
         });
         
         // Send welcome email for new subscriptions
         if (eventType === 'subscription.created') {
+          console.log('Sending welcome email for new subscription');
           await sendWelcomeEmail(updatedUser);
         }
         
         // Send receipt email
+        console.log('Sending receipt email');
         await sendReceiptEmail(updatedUser, {
           orderId: body.data.order_id
         });
@@ -205,6 +211,7 @@ router.post('/webhook', async (req, res) => {
         
       case 'subscription.cancelled':
         // When a subscription is cancelled
+        console.log(`Processing subscription cancellation for user ${userId}`);
         await User.findByIdAndUpdate(userId, { 
           subscriptionStatus: 'cancelled',
           quotesEnabled: false,
@@ -216,6 +223,7 @@ router.post('/webhook', async (req, res) => {
       case 'subscription.updated':
         // When a subscription is updated
         const status = body.data.status;
+        console.log(`Processing subscription update for user ${userId} to status: ${status}`);
         await User.findByIdAndUpdate(userId, { 
           subscriptionStatus: status,
           quotesEnabled: status === 'active',
@@ -235,7 +243,8 @@ router.post('/webhook', async (req, res) => {
       isPay: finalUser.isPay,
       subscriptionStatus: finalUser.subscriptionStatus,
       quotesEnabled: finalUser.quotesEnabled,
-      subscriptionId: finalUser.subscriptionId
+      subscriptionId: finalUser.subscriptionId,
+      paymentUpdatedAt: finalUser.paymentUpdatedAt
     });
     
     console.log(`Webhook processed successfully for event: ${eventType}`);
@@ -785,15 +794,26 @@ router.get('/test-checkout-url', auth, async (req, res) => {
 router.get('/verify-subscription', auth, async (req, res) => {
   try {
     const userId = req.user.id;
+    console.log(`Verifying subscription for user: ${userId}`);
     
     // Get user with latest data
     const user = await User.findById(userId);
     if (!user) {
+      console.error(`User not found: ${userId}`);
       return res.status(404).json({ message: 'User not found' });
     }
     
+    console.log('Current user status:', {
+      email: user.email,
+      isPay: user.isPay,
+      subscriptionStatus: user.subscriptionStatus,
+      subscriptionId: user.subscriptionId,
+      quotesEnabled: user.quotesEnabled
+    });
+    
     // If user has no subscription ID, they haven't subscribed yet
     if (!user.subscriptionId) {
+      console.log('No subscription ID found for user');
       return res.json({
         success: true,
         isPay: false,
@@ -805,10 +825,14 @@ router.get('/verify-subscription', auth, async (req, res) => {
     }
     
     // Check subscription status with payment provider
+    console.log(`Checking subscription status with Paddle for ID: ${user.subscriptionId}`);
     const subscriptionData = await verifySubscriptionStatus(user.subscriptionId);
+    
+    console.log('Subscription data from Paddle:', subscriptionData);
     
     // Update user status based on subscription state
     if (subscriptionData.isActive) {
+      console.log('Subscription is active, updating user status');
       await User.findByIdAndUpdate(userId, {
         isPay: true,
         isRegistrationComplete: true,
@@ -826,6 +850,7 @@ router.get('/verify-subscription', auth, async (req, res) => {
         message: 'Subscription is active'
       });
     } else {
+      console.log(`Subscription is not active, status: ${subscriptionData.status}`);
       await User.findByIdAndUpdate(userId, {
         isPay: false,
         quotesEnabled: false,
@@ -844,9 +869,11 @@ router.get('/verify-subscription', auth, async (req, res) => {
     }
   } catch (error) {
     console.error('Error verifying subscription:', error);
+    console.error('Error stack:', error.stack);
     return res.status(500).json({ 
       success: false, 
-      message: 'Error verifying subscription status' 
+      message: 'Error verifying subscription status',
+      error: error.message
     });
   }
 });
