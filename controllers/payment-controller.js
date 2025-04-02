@@ -3,57 +3,7 @@ const User = require('../models/User');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 
-// Initialize LemonSqueezy API client
-const lemonSqueezyApi = axios.create({
-  baseURL: 'https://api.lemonsqueezy.com/v1',
-  headers: {
-    'Authorization': `Bearer ${process.env.LEMON_SQUEEZY_API_KEY}`,
-    'Accept': 'application/json',
-    'Content-Type': 'application/json'
-  }
-});
 
-// Verify a webhook signature from LemonSqueezy
-const verifyWebhookSignature = (signature, body) => {
-  console.log('==== WEBHOOK SIGNATURE VERIFICATION ====');
-  
-  // Log the raw body for debugging
-  console.log('Raw webhook body:', body);
-  
-  // Log the first 500 characters for a quick preview
-  const bodyPreview = typeof body === 'string' ? body.substring(0, 500) : JSON.stringify(body).substring(0, 500);
-  console.log('Webhook body preview:', bodyPreview);
-  console.log('Received signature:', signature);
-  
-  // Check if webhook secret is configured
-  if (!process.env.LEMON_SQUEEZY_WEBHOOK_SECRET) {
-    console.error('⚠️ LEMON_SQUEEZY_WEBHOOK_SECRET is not set in environment variables');
-    return false;
-  }
-
-  try {
-    // Create HMAC with SHA256
-    const hmac = crypto.createHmac('sha256', process.env.LEMON_SQUEEZY_WEBHOOK_SECRET);
-    
-    // Update with the raw body
-    hmac.update(body);
-    
-    // Get the calculated signature
-    const calculatedSignature = hmac.digest('hex');
-    
-    // Compare signatures
-    const isValid = crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(calculatedSignature)
-    );
-    
-    console.log('Signature verification result:', isValid);
-    return isValid;
-  } catch (error) {
-    console.error('Error verifying webhook signature:', error);
-    return false;
-  }
-};
 
 // Process a successful payment and mark registration as complete
 const processSuccessfulPayment = async (userId, subscriptionId = null) => {
@@ -195,89 +145,11 @@ const getUserPaymentStatus = async (userId) => {
   }
 };
 
-// Generate a direct checkout URL for LemonSqueezy
-const generateLemonCheckoutUrl = (userId) => {
-  // Use the variant slug instead of the ID
-  const variantSlug = '9e44dcc7-edab-43f0-b9a2-9d663d4af336';
-  
-  if (!variantSlug) {
-    throw new Error('Missing variant slug');
-  }
-  
-  if (!userId) {
-    console.error('WARNING: Missing userId when generating checkout URL');
-  }
-  
-  // Log the user ID for debugging
-  console.log(`Generating checkout URL for user: ${userId}`);
-  
-  // Get the application URL from environment or use a default
-  const appUrl = process.env.APP_URL || 'https://app.dailyinspire.xyz';
-  
-  // Fixed URL format with proper path structure
-  // Format: https://dailyinspire.lemonsqueezy.com/buy/{variant-slug}?params
-  const baseUrl = `https://dailyinspire.lemonsqueezy.com/buy/${variantSlug}`;
-  
-  // Create a URLSearchParams object for proper parameter encoding
-  const params = new URLSearchParams();
-  params.append('checkout[custom][user_id]', userId || 'unknown');
-  params.append('discount', '0');
-  params.append('checkout[success_url]', `${appUrl}/payment-success`);
-  params.append('checkout[cancel_url]', `${appUrl}/payment`);
-  
-  // Combine base URL with properly encoded parameters
-  const fullUrl = `${baseUrl}?${params.toString()}`;
-  
-  console.log('Generated LemonSqueezy checkout URL:', fullUrl);
-  
-  return fullUrl;
-};
 
-// Verify a subscription status directly with the LemonSqueezy API
-// Use this as a fallback when webhooks fail
-const verifySubscriptionStatus = async (subscriptionId) => {
-  if (!subscriptionId) {
-    throw new Error('Missing subscription ID');
-  }
-  
-  if (!process.env.LEMON_SQUEEZY_API_KEY) {
-    throw new Error('Missing LemonSqueezy API key');
-  }
-  
-  try {
-    console.log(`Verifying subscription status directly with LemonSqueezy API: ${subscriptionId}`);
-    
-    const response = await lemonSqueezyApi.get(`/subscriptions/${subscriptionId}`);
-    
-    if (!response || !response.data || !response.data.data) {
-      throw new Error('Invalid response from LemonSqueezy API');
-    }
-    
-    console.log('LemonSqueezy API response:', JSON.stringify(response.data, null, 2));
-    
-    const subscriptionData = response.data.data;
-    const status = subscriptionData.attributes?.status;
-    
-    console.log(`Subscription ${subscriptionId} status: ${status}`);
-    
-    return {
-      id: subscriptionId,
-      status,
-      isActive: status === 'active',
-      customData: subscriptionData.attributes?.custom_data || {}
-    };
-  } catch (error) {
-    console.error(`Error verifying subscription status with LemonSqueezy API: ${error.message}`);
-    throw error;
-  }
-};
+
 
 module.exports = {
-  lemonSqueezyApi,
-  verifyWebhookSignature,
   processSuccessfulPayment,
   sendReceiptEmail,
   getUserPaymentStatus,
-  generateLemonCheckoutUrl,
-  verifySubscriptionStatus
 }; 
