@@ -119,7 +119,7 @@ router.post('/forgot-password', async (req, res) => {
     
     // Configure email options
     const mailOptions = {
-      from: process.env.EMAIL_FROM || 'DailyInspire <noreply@dailyinspire.com>',
+      from: process.env.EMAIL_FROM || 'DailyInspire <noreply@dailyinspire.xyz>',
       to: user.email,
       subject: 'DailyInspire - Password Reset',
       html: emailContent
@@ -247,7 +247,7 @@ router.post('/reset-password', async (req, res) => {
       `;
       
       const mailOptions = {
-        from: process.env.EMAIL_FROM || 'DailyInspire <noreply@dailyinspire.com>',
+        from: process.env.EMAIL_FROM || 'DailyInspire <noreply@dailyinspire.xyz>',
         to: user.email,
         subject: 'DailyInspire - Password Changed Successfully',
         html: emailContent
