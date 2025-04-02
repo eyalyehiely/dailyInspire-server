@@ -148,6 +148,9 @@ router.post('/webhook', async (req, res) => {
     if (body.data?.custom_data?.user_id) {
       userId = body.data.custom_data.user_id;
       console.log('Found user ID in custom data:', userId);
+    } else if (body.data?.customer?.custom_data?.user_id) {
+      userId = body.data.customer.custom_data.user_id;
+      console.log('Found user ID in customer custom data:', userId);
     }
     
     // If no user ID in custom data, try to find by email
@@ -157,11 +160,13 @@ router.post('/webhook', async (req, res) => {
       if (user) {
         userId = user._id.toString();
         console.log('Found user by email:', userId);
+      } else {
+        console.log('No user found with email:', body.data.customer.email);
       }
     }
     
     if (!userId) {
-      console.error('No user ID found in webhook data');
+      console.error('No user ID found in webhook data. Full webhook body:', JSON.stringify(body, null, 2));
       return res.status(400).json({ error: 'Could not identify user' });
     }
     
