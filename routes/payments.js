@@ -18,13 +18,27 @@ const mongoose = require('mongoose');
 router.get('/checkout-info', auth, async (req, res) => {
   try {
     console.log('=== CHECKOUT INFO REQUEST ===');
-    console.log('User ID:', req.user.id);
+    console.log('User ID:', req.user?.id);
+    console.log('Auth token present:', !!req.headers.authorization);
+    
+    if (!req.user?.id) {
+      console.error('No user ID found in request');
+      return res.status(401).json({ 
+        message: 'Authentication required',
+        error: 'No user ID found'
+      });
+    }
+    
     console.log('PADDLE_PRODUCT_ID from env:', process.env.PADDLE_PRODUCT_ID);
     
     // Check if user is already paid
     const user = await User.findById(req.user.id);
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      console.error('User not found:', req.user.id);
+      return res.status(404).json({ 
+        message: 'User not found',
+        error: 'User not found in database'
+      });
     }
     
     // If user already has paid status, return that info
@@ -51,7 +65,11 @@ router.get('/checkout-info', auth, async (req, res) => {
     return res.json(responseData);
   } catch (error) {
     console.error('Error in checkout-info route:', error);
-    return res.status(500).json({ message: 'Server error', error: error.message });
+    return res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
