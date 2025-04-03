@@ -19,7 +19,14 @@ const paddleApi = axios.create({
  */
 const getSubscription = async (paddleId) => {
   try {
-    const response = await paddleApi.get(`/subscriptions/${paddleId}`);
+    // Format subscription ID to ensure it starts with 'sub_'
+    let formattedPaddleId = paddleId;
+    if (!paddleId.startsWith('sub_')) {
+      formattedPaddleId = `sub_${paddleId}`;
+      console.log(`Formatted subscription ID from ${paddleId} to ${formattedPaddleId}`);
+    }
+    
+    const response = await paddleApi.get(`/subscriptions/${formattedPaddleId}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching subscription ${paddleId}:`, error.message);

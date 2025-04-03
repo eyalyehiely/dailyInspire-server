@@ -61,12 +61,19 @@ const processSuccessfulPayment = async (userId, subscriptionId) => {
       subscriptionId: existingUser.subscriptionId
     });
     
+    // Format subscription ID to ensure it starts with 'sub_'
+    let formattedSubscriptionId = subscriptionId;
+    if (subscriptionId && !subscriptionId.startsWith('sub_')) {
+      formattedSubscriptionId = `sub_${subscriptionId}`;
+      console.log(`Formatted subscription ID from ${subscriptionId} to ${formattedSubscriptionId}`);
+    }
+    
     // Update user payment status and complete registration
     const updateData = {
       isPay: true,
       isRegistrationComplete: true,
       quotesEnabled: true,
-      subscriptionId: subscriptionId || existingUser.subscriptionId,
+      subscriptionId: formattedSubscriptionId || existingUser.subscriptionId,
       subscriptionStatus: 'active',
       paymentUpdatedAt: new Date()
     };
@@ -199,17 +206,24 @@ const verifySubscriptionStatus = async (subscriptionId) => {
     throw new Error('Missing Paddle API key');
   }
 
+  // Format subscription ID to ensure it starts with 'sub_'
+  let formattedSubscriptionId = subscriptionId;
+  if (!subscriptionId.startsWith('sub_')) {
+    formattedSubscriptionId = `sub_${subscriptionId}`;
+    console.log(`Formatted subscription ID from ${subscriptionId} to ${formattedSubscriptionId}`);
+  }
+
   const maxRetries = 3;
   let retryCount = 0;
   let lastError = null;
 
   while (retryCount < maxRetries) {
     try {
-      const response = await paddleApi.get(`/subscriptions/${subscriptionId}`);
+      const response = await paddleApi.get(`/subscriptions/${formattedSubscriptionId}`);
       
       if (!response || !response.data) {
         return {
-          id: subscriptionId,
+          id: formattedSubscriptionId,
           status: 'not_found',
           isActive: false,
           customData: {}
@@ -220,7 +234,7 @@ const verifySubscriptionStatus = async (subscriptionId) => {
       const status = subscriptionData.status;
 
       return {
-        id: subscriptionId,
+        id: formattedSubscriptionId,
         status,
         isActive: status === 'active',
         customData: subscriptionData.custom_data || {}
@@ -230,7 +244,7 @@ const verifySubscriptionStatus = async (subscriptionId) => {
       retryCount++;
       
       if (retryCount < maxRetries) {
-        console.log(`Retry ${retryCount}/${maxRetries} for subscription ${subscriptionId}`);
+        console.log(`Retry ${retryCount}/${maxRetries} for subscription ${formattedSubscriptionId}`);
         await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Exponential backoff
       }
     }
@@ -238,7 +252,7 @@ const verifySubscriptionStatus = async (subscriptionId) => {
 
   console.error(`Error verifying subscription status with Paddle API after ${maxRetries} retries: ${lastError.message}`);
   return {
-    id: subscriptionId,
+    id: formattedSubscriptionId,
     status: 'error',
     isActive: false,
     customData: {}
