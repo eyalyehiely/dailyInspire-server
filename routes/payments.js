@@ -318,11 +318,14 @@ router.get('/status', auth, async (req, res) => {
     // If user has a subscription ID, fetch card details and URLs from Paddle API
     if (user.subscriptionId) {
       try {
+        console.log('Fetching subscription details from Paddle for ID:', user.subscriptionId);
         const response = await paddleApi.get(`/subscriptions/${user.subscriptionId}`);
         
         // Check if response follows Paddle's API format
         if (response.data && response.data.data) {
           const subData = response.data.data;
+          console.log('Received subscription data from Paddle:', subData);
+          
           subscriptionDetails = subData;
           
           // Extract card details from payment information
@@ -337,11 +340,16 @@ router.get('/status', auth, async (req, res) => {
           
           // Update user's payment status based on Paddle's status
           const paddleStatus = subData.status;
+          console.log('Current Paddle status:', paddleStatus);
+          console.log('Current user status:', user.subscriptionStatus);
+          
           if (paddleStatus !== user.subscriptionStatus) {
+            console.log('Updating user status to match Paddle status');
             await User.findByIdAndUpdate(req.user.id, {
               subscriptionStatus: paddleStatus,
               isPay: paddleStatus === 'active',
-              quotesEnabled: paddleStatus === 'active'
+              quotesEnabled: paddleStatus === 'active',
+              paymentUpdatedAt: new Date()
             });
             user.subscriptionStatus = paddleStatus;
             user.isPay = paddleStatus === 'active';
@@ -353,14 +361,17 @@ router.get('/status', auth, async (req, res) => {
         }
       } catch (err) {
         console.error('Error fetching subscription details:', err.message);
+        console.error('Error details:', err.response?.data || err);
         paddleError = err.message;
         
         // If the subscription is not found in Paddle, mark the user as unpaid
         if (err.response?.status === 404) {
+          console.log('Subscription not found in Paddle, marking user as unpaid');
           await User.findByIdAndUpdate(req.user.id, {
             isPay: false,
             subscriptionStatus: 'none',
-            quotesEnabled: false
+            quotesEnabled: false,
+            paymentUpdatedAt: new Date()
           });
           return res.json({
             isPay: false,
@@ -374,7 +385,7 @@ router.get('/status', auth, async (req, res) => {
       }
     }
     
-    return res.json({
+    const response = {
       isPay: user.isPay,
       isRegistrationComplete: user.isRegistrationComplete,
       quotesEnabled: user.quotesEnabled,
@@ -387,7 +398,10 @@ router.get('/status', auth, async (req, res) => {
       subscriptionDetails,
       paymentUpdatedAt: user.paymentUpdatedAt,
       error: paddleError
-    });
+    };
+    
+    console.log('Sending payment status response:', response);
+    return res.json(response);
   } catch (error) {
     console.error('Error checking payment status:', error);
     return res.status(500).json({ 
@@ -398,10 +412,6 @@ router.get('/status', auth, async (req, res) => {
   }
 });
 
-// Route for testing lemon squeezy configuration
-
-
-// Debug endpoint for testing checkout URLs
 
 
 // Raw webhook debug endpoint - logs all incoming webhook data without verification
@@ -499,71 +509,6 @@ router.post('/webhook-debug', async (req, res) => {
   }
 });
 
-// Webhook simulation endpoint for testing
-router.post('/simulate-webhook', async (req, res) => {
-  try {
-    console.log('===== SIMULATING LEMON SQUEEZY WEBHOOK =====');
-    
-    // Get the user ID from the request
-    const userId = req.body.user_id || req.query.user_id;
-    if (!userId) {
-      return res.status(400).json({ error: 'Missing user_id parameter' });
-    }
-    
-    // Check if the user exists
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: `User not found: ${userId}` });
-    }
-    
-    console.log(`Found user: ${user.email}`);
-    
-    // Create a mock webhook event
-    const mockEvent = {
-      meta: {
-        event_name: 'subscription_created',
-        custom_data: {
-          user_id: userId
-        }
-      },
-      data: {
-        id: 'test-subscription-' + Date.now(),
-        attributes: {
-          user_id: userId,
-          custom_data: {
-            user_id: userId
-          }
-        }
-      }
-    };
-    
-    console.log('Mock webhook payload:', JSON.stringify(mockEvent, null, 2));
-    
-    // Process the payment
-    const updatedUser = await processSuccessfulPayment(userId, mockEvent.data.id);
-    
-    // Send the welcome email
-    await sendWelcomeEmail(updatedUser);
-    
-    // Send the receipt email
-    await sendReceiptEmail(updatedUser, {
-      orderId: mockEvent.data.id
-    });
-    
-    return res.status(200).json({
-      success: true,
-      user: {
-        id: updatedUser._id,
-        email: updatedUser.email,
-        isPay: updatedUser.isPay,
-        subscriptionStatus: updatedUser.subscriptionStatus
-      }
-    });
-  } catch (error) {
-    console.error('Simulation error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
 
 // Debug endpoint to check a user's payment status (for admin debugging only)
 router.get('/debug-user-status', async (req, res) => {
