@@ -419,14 +419,18 @@ router.get('/status', auth, async (req, res) => {
         // Check if response follows Paddle's API format
         if (paddleSubscription && paddleSubscription.data) {
           const subData = paddleSubscription.data;
-          console.log('Received subscription data from Paddle:', subData);
+          console.log('Received subscription data from Paddle:', JSON.stringify(subData, null, 2));
           
           subscriptionDetails = subData;
           
-          // Extract card details from payment information
+          // Extract card details from payment information with better logging
           if (subData.payment_information) {
+            console.log('Payment information found:', JSON.stringify(subData.payment_information, null, 2));
             cardBrand = subData.payment_information.card_brand || "";
             cardLastFour = subData.payment_information.last_four || "";
+            console.log('Extracted card details:', { cardBrand, cardLastFour });
+          } else {
+            console.log('No payment information found in subscription data');
           }
           
           // Extract URLs from the response
@@ -478,6 +482,8 @@ router.get('/status', auth, async (req, res) => {
           });
         }
       }
+    } else {
+      console.log('No active subscription found for user:', req.user.id);
     }
     
     const response = {
@@ -495,7 +501,7 @@ router.get('/status', auth, async (req, res) => {
       error: paddleError
     };
     
-    console.log('Sending payment status response:', response);
+    console.log('Sending payment status response:', JSON.stringify(response, null, 2));
     return res.json(response);
   } catch (error) {
     console.error('Error checking payment status:', error);

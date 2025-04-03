@@ -43,6 +43,12 @@ const syncSubscription = async (paddleSubscription, userId) => {
       paddleSubscriptionId: paddleSubscription.id 
     });
     
+    console.log('Syncing subscription data:', {
+      id: paddleSubscription.id,
+      status: paddleSubscription.status,
+      paymentInfo: paddleSubscription.payment_information
+    });
+    
     const subscriptionData = {
       paddleSubscriptionId: paddleSubscription.id,
       userId,
@@ -61,8 +67,8 @@ const syncSubscription = async (paddleSubscription, userId) => {
         endsAt: new Date(paddleSubscription.trial.ends_at)
       } : null,
       paymentInformation: paddleSubscription.payment_information ? {
-        cardBrand: paddleSubscription.payment_information.card_brand,
-        lastFour: paddleSubscription.payment_information.last_four,
+        cardBrand: paddleSubscription.payment_information.card_brand || "",
+        lastFour: paddleSubscription.payment_information.last_four || "",
         expiryMonth: paddleSubscription.payment_information.expiry_month,
         expiryYear: paddleSubscription.payment_information.expiry_year
       } : null,
@@ -87,6 +93,7 @@ const syncSubscription = async (paddleSubscription, userId) => {
     
     if (subscription) {
       // Update existing subscription
+      console.log('Updating existing subscription with payment info:', subscriptionData.paymentInformation);
       subscription = await Subscription.findOneAndUpdate(
         { paddleSubscriptionId: paddleSubscription.id },
         { $set: subscriptionData },
@@ -94,6 +101,7 @@ const syncSubscription = async (paddleSubscription, userId) => {
       );
     } else {
       // Create new subscription
+      console.log('Creating new subscription with payment info:', subscriptionData.paymentInformation);
       subscription = new Subscription(subscriptionData);
       await subscription.save();
     }
