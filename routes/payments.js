@@ -204,15 +204,28 @@ router.post('/webhook', async (req, res) => {
         console.log(`Processing ${eventType} for user ${userId}`);
         
         // Extract subscription ID from various possible locations in the webhook data
-        const subscriptionId = body.data?.subscription_id || 
-                             body.data?.id || 
-                             body.data?.attributes?.subscription_id ||
-                             body.data?.attributes?.id;
+        let subscriptionId;
         
-        if (!subscriptionId) {
-          console.error('Missing subscription ID in webhook data');
-          console.log('Webhook data structure:', JSON.stringify(body, null, 2));
-          return res.status(400).json({ error: 'Missing subscription ID' });
+        if (eventType === 'checkout.completed') {
+          // For checkout.completed events, we need to get the subscription ID from the items array
+          subscriptionId = body.data?.items?.[0]?.subscription_id;
+          if (!subscriptionId) {
+            console.error('Missing subscription ID in checkout.completed webhook data');
+            console.log('Webhook data structure:', JSON.stringify(body, null, 2));
+            return res.status(400).json({ error: 'Missing subscription ID in checkout data' });
+          }
+        } else {
+          // For other subscription events
+          subscriptionId = body.data?.subscription_id || 
+                         body.data?.id || 
+                         body.data?.attributes?.subscription_id ||
+                         body.data?.attributes?.id;
+          
+          if (!subscriptionId) {
+            console.error('Missing subscription ID in webhook data');
+            console.log('Webhook data structure:', JSON.stringify(body, null, 2));
+            return res.status(400).json({ error: 'Missing subscription ID' });
+          }
         }
         
         // Validate subscription ID format
