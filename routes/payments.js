@@ -250,9 +250,18 @@ router.post('/webhook', async (req, res) => {
           
           // Send welcome email if this is a new subscription
           if (eventType === 'subscription.created') {
+            console.log(`Sending welcome email for new subscription to user ${userId}`);
             const user = await User.findById(userId);
             if (user) {
-              await sendWelcomeEmail(user);
+              try {
+                await sendWelcomeEmail(user);
+                console.log(`Welcome email successfully sent to ${user.email}`);
+              } catch (emailError) {
+                console.error(`Failed to send welcome email to ${user.email}:`, emailError);
+                // Continue processing even if email fails
+              }
+            } else {
+              console.error(`User not found for ID ${userId}, cannot send welcome email`);
             }
           }
           
@@ -716,8 +725,8 @@ router.post('/update-user-data', auth, async (req, res) => {
         quotesEnabled: true,
         isRegistrationComplete: true,
         paymentUpdatedAt: new Date(), 
-          cardBrand: cardBrand,
-          cardLastFour: cardLastFour
+        cardBrand: cardBrand,
+        cardLastFour: cardLastFour
         },
       { new: true }
     );

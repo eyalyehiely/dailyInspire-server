@@ -26,15 +26,35 @@ const sendWelcomeEmail = async (user) => {
     });
     const formattedTime = timeFormat.format(new Date(`2000-01-01T${user.preferredTime || '09:00'}`));
 
+    // Check if this is a subscription welcome email
+    const emailSubject = 'Welcome to Daily Inspirational Quotes Premium!' 
+
+    
+    // Customer portal link
+    const customerPortalLink = 'https://customer-portal.paddle.com/cpl_01jq9rqdm30n58mzpn6dcr7wbd';
+    
+    const subscriptionInfo = 
+       `<div style="background-color: #e6f7ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #0066cc;">Premium Subscription Activated</h3>
+          <p>Thank you for subscribing to our premium service! Your account has been upgraded and you now have access to all premium features.</p>
+          <p><strong>Subscription Status:</strong> Active</p>
+          <p><strong>Subscription ID:</strong> ${user.subscriptionId || 'N/A'}</p>
+          <p>You can manage your subscription anytime through our customer portal:</p>
+          <p><a href="${customerPortalLink}" style="display: inline-block; background-color: #0066cc; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 10px;">Manage Subscription</a></p>
+        </div>` 
+      ;
+
     const mailOptions = {
       from: process.env.EMAIL_FROM || `Daily Inspirational Quotes <${process.env.EMAIL_USER}>`,
       to: user.email,
-      subject: 'Welcome to Daily Inspirational Quotes!',
+      subject: emailSubject,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
           <h2>Welcome to Daily Inspirational Quotes, ${user.first_name}!</h2>
           
           <p>Thank you for signing up for our daily quote service. Your account has been successfully created!</p>
+          
+          ${subscriptionInfo}
           
           <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #333;">Your Preferences</h3>
@@ -56,6 +76,7 @@ const sendWelcomeEmail = async (user) => {
           
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
             <p style="color: #666; font-size: 14px;">If you ever want to update your preferences or unsubscribe, you can do so by logging into your account or clicking the unsubscribe link in any of our emails.</p>
+            ${isSubscriptionWelcome ? `<p style="color: #666; font-size: 14px;">To manage your subscription, visit our <a href="${customerPortalLink}">customer portal</a>.</p>` : ''}
           </div>
         </div>
       `
