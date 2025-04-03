@@ -714,6 +714,7 @@ router.post('/update-user-data', auth, async (req, res) => {
         subscriptionStatus: subscriptionStatus || 'active',
         isPay: true,
         quotesEnabled: true,
+        isRegistrationComplete: true,
         paymentUpdatedAt: new Date(), 
         ...(cardBrand && cardLastFour && {
           cardBrand: cardBrand,
@@ -735,6 +736,7 @@ router.post('/update-user-data', auth, async (req, res) => {
         isPay: user.isPay,
         subscriptionStatus: user.subscriptionStatus,
         quotesEnabled: user.quotesEnabled,
+        isRegistrationComplete: user.isRegistrationComplete,
         cardBrand: user.cardBrand,
         cardLastFour: user.cardLastFour
       }
@@ -812,6 +814,7 @@ router.get('/verify-transaction/:transactionId', auth, async (req, res) => {
         subscriptionStatus: 'active',
         isPay: true,
         quotesEnabled: true,
+        isRegistrationComplete: true,
         paymentUpdatedAt: new Date()
       },
       { new: true }

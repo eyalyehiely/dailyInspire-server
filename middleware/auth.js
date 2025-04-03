@@ -4,7 +4,8 @@ const User = require('../models/User');
 const auth = async (req, res, next) => {
   try {
     // Log the request headers for debugging
-    // console.log('Auth middleware: Headers received:', JSON.stringify(req.headers));
+    console.log('Auth middleware: Request path:', req.path);
+    console.log('Auth middleware: Authorization header present:', !!req.header('Authorization'));
     
     // Get token from header
     const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -12,6 +13,7 @@ const auth = async (req, res, next) => {
     console.log('Auth middleware: Token extracted:', token ? 'Token found' : 'No token found');
     
     if (!token) {
+      console.log('Auth middleware: No token provided in request');
       return res.status(401).json({ message: 'Authentication required' });
     }
     
@@ -28,12 +30,25 @@ const auth = async (req, res, next) => {
     }
     
     console.log('Auth middleware: User found, email:', user.email);
+    console.log('Auth middleware: User registration status:', {
+      isRegistrationComplete: user.isRegistrationComplete,
+      isPay: user.isPay,
+      subscriptionStatus: user.subscriptionStatus
+    });
     
     // Attach user to request object
     req.user = user;
     next();
   } catch (error) {
     console.error('Auth middleware: Error:', error.message);
+    if (error.name === 'JsonWebTokenError') {
+      console.error('Auth middleware: JWT verification failed:', error.message);
+      return res.status(401).json({ message: 'Invalid token' });
+    }
+    if (error.name === 'TokenExpiredError') {
+      console.error('Auth middleware: Token expired');
+      return res.status(401).json({ message: 'Token expired' });
+    }
     res.status(401).json({ message: 'Authentication failed' });
   }
 };
