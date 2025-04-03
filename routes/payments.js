@@ -696,7 +696,7 @@ router.post('/admin/force-upgrade', async (req, res) => {
 // Route to update user payment data
 router.post('/update-user-data', auth, async (req, res) => {
   try {
-    const { subscriptionId, subscriptionStatus, paymentInformation } = req.body;
+    const { subscriptionId, subscriptionStatus, cardBrand, cardLastFour } = req.body;
     
     if (!subscriptionId) {
       return res.status(400).json({ error: 'Subscription ID is required' });
@@ -716,11 +716,9 @@ router.post('/update-user-data', auth, async (req, res) => {
         quotesEnabled: true,
         isRegistrationComplete: true,
         paymentUpdatedAt: new Date(), 
-        ...(paymentInformation && {
-          cardBrand: paymentInformation.cardBrand,
-          cardLastFour: paymentInformation.lastFour
-        })
-      },
+          cardBrand: cardBrand,
+          cardLastFour: cardLastFour
+        },
       { new: true }
     );
     
