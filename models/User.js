@@ -38,8 +38,16 @@ const UserSchema = new mongoose.Schema({
   },
   subscriptionStatus: {
     type: String,
-    enum: ['none', 'active', 'cancelled', 'expired', 'paused', 'payment_failed'],
+    enum: ['none', 'active', 'canceled', 'past_due', 'unpaid', 'trialing', 'paused'],
     default: 'none'
+  },
+  cardBrand: {
+    type: String,
+    default: null
+  },
+  cardLastFour: {
+    type: String,
+    default: null
   },
   paymentUpdatedAt: {
     type: Date,

@@ -24,6 +24,10 @@ const getSubscription = async (paddleId) => {
     if (!paddleId.startsWith('sub_')) {
       formattedPaddleId = `sub_${paddleId}`;
       console.log(`Formatted subscription ID from ${paddleId} to ${formattedPaddleId}`);
+    } else if (paddleId.startsWith('sub_sub_')) {
+      // Fix double-prefixed subscription IDs
+      formattedPaddleId = paddleId.replace('sub_sub_', 'sub_');
+      console.log(`Fixed double-prefixed subscription ID from ${paddleId} to ${formattedPaddleId}`);
     }
     
     const response = await paddleApi.get(`/subscriptions/${formattedPaddleId}`);

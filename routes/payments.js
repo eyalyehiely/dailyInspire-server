@@ -228,6 +228,16 @@ router.post('/webhook', async (req, res) => {
           }
         }
         
+        // Format subscription ID to ensure it starts with 'sub_'
+        if (!subscriptionId.startsWith('sub_')) {
+          subscriptionId = `sub_${subscriptionId}`;
+          console.log(`Formatted subscription ID to ${subscriptionId}`);
+        } else if (subscriptionId.startsWith('sub_sub_')) {
+          // Fix double-prefixed subscription IDs
+          subscriptionId = subscriptionId.replace('sub_sub_', 'sub_');
+          console.log(`Fixed double-prefixed subscription ID from ${subscriptionId} to ${subscriptionId}`);
+        }
+        
         // Validate subscription ID format
         if (typeof subscriptionId !== 'string' || subscriptionId.trim().length === 0) {
           console.error('Invalid subscription ID format:', subscriptionId);
@@ -693,39 +703,59 @@ router.post('/admin/force-upgrade', async (req, res) => {
 // Route to update user payment data
 router.post('/update-user-data', auth, async (req, res) => {
   try {
-    console.log('Updating user payment data:', req.body);
+    const { subscriptionId, subscriptionStatus, cardInfo } = req.body;
     
-    const { subscriptionId, subscriptionStatus, transactionId } = req.body;
-    
-    if (!subscriptionId || !subscriptionStatus) {
-      return res.status(400).json({ 
-        error: 'Missing required fields',
-        message: 'subscriptionId and subscriptionStatus are required'
-      });
+    if (!subscriptionId) {
+      return res.status(400).json({ error: 'Subscription ID is required' });
     }
     
-    // Process the payment update
-    const updatedUser = await processSuccessfulPayment(req.user.id, subscriptionId);
+    // Format subscription ID to ensure it starts with 'sub_'
+    let formattedSubscriptionId = subscriptionId;
+    if (!subscriptionId.startsWith('sub_')) {
+      formattedSubscriptionId = `sub_${subscriptionId}`;
+      console.log(`Formatted subscription ID from ${subscriptionId} to ${formattedSubscriptionId}`);
+    } else if (subscriptionId.startsWith('sub_sub_')) {
+      // Fix double-prefixed subscription IDs
+      formattedSubscriptionId = subscriptionId.replace('sub_sub_', 'sub_');
+      console.log(`Fixed double-prefixed subscription ID from ${subscriptionId} to ${formattedSubscriptionId}`);
+    }
     
-    // Return updated user data
+    // Update user's subscription data
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      {
+        subscriptionId: formattedSubscriptionId,
+        subscriptionStatus: subscriptionStatus || 'active',
+        isPay: true,
+        quotesEnabled: true,
+        paymentUpdatedAt: new Date(),
+        ...(cardInfo && {
+          cardBrand: cardInfo.cardBrand,
+          cardLastFour: cardInfo.cardLastFour
+        })
+      },
+      { new: true }
+    );
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
     return res.json({
       success: true,
-      message: 'Payment data updated successfully',
       user: {
-        id: updatedUser._id,
-        email: updatedUser.email,
-        isPay: updatedUser.isPay,
-        subscriptionStatus: updatedUser.subscriptionStatus,
-        subscriptionId: updatedUser.subscriptionId,
-        quotesEnabled: updatedUser.quotesEnabled
+        id: user._id,
+        email: user.email,
+        isPay: user.isPay,
+        subscriptionStatus: user.subscriptionStatus,
+        quotesEnabled: user.quotesEnabled,
+        cardBrand: user.cardBrand,
+        cardLastFour: user.cardLastFour
       }
     });
   } catch (error) {
-    console.error('Error updating user payment data:', error);
-    return res.status(500).json({ 
-      error: error.message,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    console.error('Error updating user data:', error);
+    return res.status(500).json({ error: error.message });
   }
 });
 

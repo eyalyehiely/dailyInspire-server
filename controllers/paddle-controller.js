@@ -66,6 +66,10 @@ const processSuccessfulPayment = async (userId, subscriptionId) => {
     if (subscriptionId && !subscriptionId.startsWith('sub_')) {
       formattedSubscriptionId = `sub_${subscriptionId}`;
       console.log(`Formatted subscription ID from ${subscriptionId} to ${formattedSubscriptionId}`);
+    } else if (subscriptionId && subscriptionId.startsWith('sub_sub_')) {
+      // Fix double-prefixed subscription IDs
+      formattedSubscriptionId = subscriptionId.replace('sub_sub_', 'sub_');
+      console.log(`Fixed double-prefixed subscription ID from ${subscriptionId} to ${formattedSubscriptionId}`);
     }
     
     // Update user payment status and complete registration
@@ -211,6 +215,10 @@ const verifySubscriptionStatus = async (subscriptionId) => {
   if (!subscriptionId.startsWith('sub_')) {
     formattedSubscriptionId = `sub_${subscriptionId}`;
     console.log(`Formatted subscription ID from ${subscriptionId} to ${formattedSubscriptionId}`);
+  } else if (subscriptionId.startsWith('sub_sub_')) {
+    // Fix double-prefixed subscription IDs
+    formattedSubscriptionId = subscriptionId.replace('sub_sub_', 'sub_');
+    console.log(`Fixed double-prefixed subscription ID from ${subscriptionId} to ${formattedSubscriptionId}`);
   }
 
   const maxRetries = 3;
