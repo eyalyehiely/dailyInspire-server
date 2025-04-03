@@ -696,7 +696,7 @@ router.post('/admin/force-upgrade', async (req, res) => {
 // Route to update user payment data
 router.post('/update-user-data', auth, async (req, res) => {
   try {
-    const { subscriptionId, subscriptionStatus, cardInfo } = req.body;
+    const { subscriptionId, subscriptionStatus, cardBrand, cardLastFour } = req.body;
     
     if (!subscriptionId) {
       return res.status(400).json({ error: 'Subscription ID is required' });
@@ -716,8 +716,8 @@ router.post('/update-user-data', auth, async (req, res) => {
         quotesEnabled: true,
         paymentUpdatedAt: new Date(),
         ...(cardInfo && {
-          cardBrand: cardInfo.cardBrand,
-          cardLastFour: cardInfo.cardLastFour
+          cardBrand: cardBrand,
+          cardLastFour: cardLastFour
         })
       },
       { new: true }
@@ -742,6 +742,110 @@ router.post('/update-user-data', auth, async (req, res) => {
   } catch (error) {
     console.error('Error updating user data:', error);
     return res.status(500).json({ error: error.message });
+  }
+});
+
+// Route to verify a transaction with Paddle
+router.get('/verify-transaction/:transactionId', auth, async (req, res) => {
+  try {
+    console.log('=== VERIFY TRANSACTION REQUEST ===');
+    console.log('Transaction ID:', req.params.transactionId);
+    console.log('User ID:', req.user?.id);
+    
+    if (!req.user?.id) {
+      console.error('No user ID found in request');
+      return res.status(401).json({ 
+        message: 'Authentication required',
+        error: 'No user ID found'
+      });
+    }
+    
+    if (!req.params.transactionId) {
+      console.error('No transaction ID provided');
+      return res.status(400).json({ 
+        message: 'Transaction ID is required',
+        error: 'No transaction ID provided'
+      });
+    }
+    
+    // Call Paddle API to get transaction details
+    console.log('Fetching transaction details from Paddle API');
+    const response = await paddleApi.get(`/transactions/${req.params.transactionId}`);
+    
+    if (!response.data || !response.data.data) {
+      console.error('Invalid response from Paddle API');
+      return res.status(404).json({ 
+        message: 'Transaction not found',
+        error: 'Invalid response from Paddle API'
+      });
+    }
+    
+    const transaction = response.data.data;
+    console.log('Transaction data:', transaction);
+    
+    // Check if the transaction is completed
+    if (transaction.status !== 'completed') {
+      console.error('Transaction not completed:', transaction.status);
+      return res.status(400).json({ 
+        message: 'Transaction not completed',
+        error: `Transaction status: ${transaction.status}`
+      });
+    }
+    
+    // Extract subscription ID from the transaction
+    const subscriptionId = transaction.subscription_id;
+    console.log('Subscription ID from transaction:', subscriptionId);
+    
+    if (!subscriptionId) {
+      console.error('No subscription ID found in transaction data');
+      return res.status(400).json({ 
+        message: 'No subscription ID found',
+        error: 'No subscription ID found in transaction data'
+      });
+    }
+    
+    // Update user's subscription data
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      {
+        subscriptionId: subscriptionId,
+        subscriptionStatus: 'active',
+        isPay: true,
+        quotesEnabled: true,
+        paymentUpdatedAt: new Date()
+      },
+      { new: true }
+    );
+    
+    if (!user) {
+      console.error('User not found:', req.user.id);
+      return res.status(404).json({ 
+        message: 'User not found',
+        error: 'User not found in database'
+      });
+    }
+    
+    console.log('User subscription updated successfully');
+    
+    return res.json({
+      success: true,
+      message: 'Transaction verified successfully',
+      transaction: transaction,
+      user: {
+        id: user._id,
+        email: user.email,
+        isPay: user.isPay,
+        subscriptionStatus: user.subscriptionStatus,
+        quotesEnabled: user.quotesEnabled
+      }
+    });
+  } catch (error) {
+    console.error('Error verifying transaction:', error);
+    return res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
