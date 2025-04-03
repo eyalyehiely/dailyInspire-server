@@ -684,4 +684,43 @@ router.post('/admin/force-upgrade', async (req, res) => {
   }
 });
 
+// Route to update user payment data
+router.post('/update-user-data', auth, async (req, res) => {
+  try {
+    console.log('Updating user payment data:', req.body);
+    
+    const { subscriptionId, subscriptionStatus, transactionId } = req.body;
+    
+    if (!subscriptionId || !subscriptionStatus) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        message: 'subscriptionId and subscriptionStatus are required'
+      });
+    }
+    
+    // Process the payment update
+    const updatedUser = await processSuccessfulPayment(req.user.id, subscriptionId);
+    
+    // Return updated user data
+    return res.json({
+      success: true,
+      message: 'Payment data updated successfully',
+      user: {
+        id: updatedUser._id,
+        email: updatedUser.email,
+        isPay: updatedUser.isPay,
+        subscriptionStatus: updatedUser.subscriptionStatus,
+        subscriptionId: updatedUser.subscriptionId,
+        quotesEnabled: updatedUser.quotesEnabled
+      }
+    });
+  } catch (error) {
+    console.error('Error updating user payment data:', error);
+    return res.status(500).json({ 
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 module.exports = router;
