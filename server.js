@@ -66,9 +66,5 @@ startScheduler();
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
   
-  // Check webhook configuration
-  checkWebhookConfiguration();
 });
-
-// Function to check webhook configuration
 
