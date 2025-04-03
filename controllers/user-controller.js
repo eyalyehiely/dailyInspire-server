@@ -3,6 +3,14 @@ const nodemailer = require('nodemailer');
 // Function to send welcome email after signup
 const sendWelcomeEmail = async (user) => {
   try {
+    console.log('Preparing to send welcome email to:', user.email);
+    console.log('Email configuration:', {
+      service: process.env.EMAIL_SERVICE || 'gmail',
+      user: process.env.EMAIL_USER ? 'Set' : 'Not set',
+      password: process.env.EMAIL_PASSWORD ? 'Set' : 'Not set',
+      from: process.env.EMAIL_FROM || `Daily Inspirational Quotes <${process.env.EMAIL_USER}>`
+    });
+    
     const transporter = nodemailer.createTransport({
       service: process.env.EMAIL_SERVICE || 'gmail',
       auth: {
@@ -27,14 +35,16 @@ const sendWelcomeEmail = async (user) => {
     const formattedTime = timeFormat.format(new Date(`2000-01-01T${user.preferredTime || '09:00'}`));
 
     // Check if this is a subscription welcome email
-    const emailSubject = 'Welcome to Daily Inspirational Quotes Premium!' 
-
+    const isSubscriptionWelcome = user.isPay === true;
+    const emailSubject = isSubscriptionWelcome 
+      ? 'Welcome to Daily Inspirational Quotes Premium!' 
+      : 'Welcome to Daily Inspirational Quotes!';
     
     // Customer portal link
     const customerPortalLink = 'https://customer-portal.paddle.com/cpl_01jq9rqdm30n58mzpn6dcr7wbd';
     
-    const subscriptionInfo = 
-       `<div style="background-color: #e6f7ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
+    const subscriptionInfo = isSubscriptionWelcome 
+      ? `<div style="background-color: #e6f7ff; padding: 15px; border-radius: 8px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #0066cc;">Premium Subscription Activated</h3>
           <p>Thank you for subscribing to our premium service! Your account has been upgraded and you now have access to all premium features.</p>
           <p><strong>Subscription Status:</strong> Active</p>
@@ -42,7 +52,7 @@ const sendWelcomeEmail = async (user) => {
           <p>You can manage your subscription anytime through our customer portal:</p>
           <p><a href="${customerPortalLink}" style="display: inline-block; background-color: #0066cc; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 10px;">Manage Subscription</a></p>
         </div>` 
-      ;
+      : '';
 
     const mailOptions = {
       from: process.env.EMAIL_FROM || `Daily Inspirational Quotes <${process.env.EMAIL_USER}>`,
@@ -82,10 +92,20 @@ const sendWelcomeEmail = async (user) => {
       `
     };
 
-    await transporter.sendMail(mailOptions);
-    console.log(`Welcome email sent to ${user.email}`);
+    console.log('Sending welcome email to:', user.email);
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`Welcome email sent successfully to ${user.email}. Message ID: ${info.messageId}`);
+    return info;
   } catch (error) {
     console.error('Error sending welcome email:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode,
+      stack: error.stack
+    });
     // Don't throw - we don't want to break the signup process if email fails
   }
 };

@@ -249,8 +249,8 @@ router.post('/webhook', async (req, res) => {
           console.log('Synced subscription:', subscription);
           
           // Send welcome email if this is a new subscription
-          if (eventType === 'subscription.created') {
-            console.log(`Sending welcome email for new subscription to user ${userId}`);
+          if (eventType === 'subscription.created' || eventType === 'checkout.completed') {
+            console.log(`Sending welcome email for ${eventType} event to user ${userId}`);
             const user = await User.findById(userId);
             if (user) {
               try {
@@ -265,12 +265,23 @@ router.post('/webhook', async (req, res) => {
             }
           }
           
-          // Send receipt email
-          const user = await User.findById(userId);
-          if (user) {
-            await sendReceiptEmail(user, {
-              orderId: subscriptionId
-            });
+          // Send receipt email for successful payments
+          if (eventType === 'subscription.payment_succeeded' || eventType === 'checkout.completed') {
+            console.log(`Sending receipt email for ${eventType} event to user ${userId}`);
+            const user = await User.findById(userId);
+            if (user) {
+              try {
+                await sendReceiptEmail(user, {
+                  orderId: subscriptionId
+                });
+                console.log(`Receipt email successfully sent to ${user.email}`);
+              } catch (emailError) {
+                console.error(`Failed to send receipt email to ${user.email}:`, emailError);
+                // Continue processing even if email fails
+              }
+            } else {
+              console.error(`User not found for ID ${userId}, cannot send receipt email`);
+            }
           }
           
           console.log(`Successfully processed payment for user: ${user?.email}`);
@@ -856,6 +867,55 @@ router.get('/verify-transaction/:transactionId', auth, async (req, res) => {
       error: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
+  }
+});
+
+// Test endpoint for email functionality
+router.post('/test-emails', auth, async (req, res) => {
+  try {
+    console.log('Testing email functionality');
+    
+    // Get the current user
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Test welcome email
+    let welcomeEmailResult = null;
+    try {
+      console.log('Testing welcome email...');
+      welcomeEmailResult = await sendWelcomeEmail(user);
+      console.log('Welcome email test result:', welcomeEmailResult);
+    } catch (error) {
+      console.error('Error testing welcome email:', error);
+    }
+    
+    // Test receipt email
+    let receiptEmailResult = null;
+    try {
+      console.log('Testing receipt email...');
+      receiptEmailResult = await sendReceiptEmail(user, { orderId: 'TEST-ORDER-' + Date.now() });
+      console.log('Receipt email test result:', receiptEmailResult);
+    } catch (error) {
+      console.error('Error testing receipt email:', error);
+    }
+    
+    return res.json({
+      success: true,
+      message: 'Email tests completed',
+      welcomeEmail: welcomeEmailResult ? 'Sent successfully' : 'Failed to send',
+      receiptEmail: receiptEmailResult ? 'Sent successfully' : 'Failed to send',
+      user: {
+        id: user._id,
+        email: user.email,
+        isPay: user.isPay,
+        subscriptionStatus: user.subscriptionStatus
+      }
+    });
+  } catch (error) {
+    console.error('Error testing emails:', error);
+    return res.status(500).json({ error: error.message });
   }
 });
 
