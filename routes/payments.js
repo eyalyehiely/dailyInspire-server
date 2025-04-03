@@ -12,6 +12,7 @@ const {
   generateClientToken
 } = require('../controllers/paddle-controller');
 const { sendWelcomeEmail } = require('../controllers/user-controller');
+const subscriptionService = require('../services/subscriptionService');
 const mongoose = require('mongoose');
 
 // Route to get payment page information
@@ -155,6 +156,21 @@ router.post('/webhook', async (req, res) => {
     console.log(`Received Paddle webhook: ${eventType}`);
     console.log('Webhook data:', JSON.stringify(body, null, 2));
     
+    // Add detailed customer data logging
+    if (body.data?.customer) {
+      console.log('===== CUSTOMER DATA RECEIVED =====');
+      console.log('Customer ID:', body.data.customer.id);
+      console.log('Customer Email:', body.data.customer.email);
+      console.log('Customer Status:', body.data.customer.status);
+      console.log('Customer Name:', body.data.customer.name);
+      console.log('Customer Created At:', body.data.customer.created_at);
+      console.log('Customer Updated At:', body.data.customer.updated_at);
+      console.log('Marketing Consent:', body.data.customer.marketing_consent);
+      console.log('Locale:', body.data.customer.locale);
+      console.log('Custom Data:', body.data.customer.custom_data);
+      console.log('================================');
+    }
+    
     // Extract user ID from custom data or find by email
     let userId = null;
     
@@ -181,6 +197,7 @@ router.post('/webhook', async (req, res) => {
     // Handle different webhook events
     switch (eventType) {
       case 'subscription.created':
+      case 'subscription.updated':
       case 'subscription.payment_succeeded':
       case 'checkout.completed':
         // When a new subscription is created or payment succeeds
@@ -207,38 +224,40 @@ router.post('/webhook', async (req, res) => {
         console.log('Processing payment with subscription ID:', subscriptionId);
         
         try {
-          // Verify the subscription status with Paddle API
-          const subscriptionData = await verifySubscriptionStatus(subscriptionId);
-          console.log('Subscription data from Paddle:', subscriptionData);
+          // Get subscription data from Paddle
+          const paddleSubscription = await subscriptionService.getSubscription(subscriptionId);
+          console.log('Subscription data from Paddle:', paddleSubscription);
           
-          if (!subscriptionData.isActive) {
-            console.error('Subscription is not active:', subscriptionData);
-            return res.status(400).json({ error: 'Subscription is not active' });
-          }
-          
-          // Process the payment
-          const updatedUser = await processSuccessfulPayment(userId, subscriptionId);
+          // Sync subscription data to our database
+          const subscription = await subscriptionService.syncSubscription(paddleSubscription, userId);
+          console.log('Synced subscription:', subscription);
           
           // Send welcome email if this is a new subscription
           if (eventType === 'subscription.created') {
-            await sendWelcomeEmail(updatedUser);
+            const user = await User.findById(userId);
+            if (user) {
+              await sendWelcomeEmail(user);
+            }
           }
           
           // Send receipt email
-          await sendReceiptEmail(updatedUser, {
-            orderId: subscriptionId
-          });
+          const user = await User.findById(userId);
+          if (user) {
+            await sendReceiptEmail(user, {
+              orderId: subscriptionId
+            });
+          }
           
-          console.log(`Successfully processed payment for user: ${updatedUser.email}`);
+          console.log(`Successfully processed payment for user: ${user?.email}`);
           return res.status(200).json({ 
             success: true,
             message: 'Payment processed successfully',
             user: {
-              id: updatedUser._id,
-              email: updatedUser.email,
-              isPay: updatedUser.isPay,
-              subscriptionStatus: updatedUser.subscriptionStatus,
-              quotesEnabled: updatedUser.quotesEnabled
+              id: user?._id,
+              email: user?.email,
+              isPay: user?.isPay,
+              subscriptionStatus: user?.subscriptionStatus,
+              quotesEnabled: user?.quotesEnabled
             }
           });
         } catch (error) {
@@ -253,24 +272,85 @@ router.post('/webhook', async (req, res) => {
       case 'subscription.cancelled':
         // When a subscription is cancelled
         console.log(`Processing subscription cancellation for user ${userId}`);
-        await User.findByIdAndUpdate(userId, { 
-          subscriptionStatus: 'cancelled',
-          quotesEnabled: false,
-          isPay: false
-        });
-        console.log(`Subscription cancelled for user ${userId}`);
+        
+        const canceledSubscriptionId = body.data?.subscription_id || 
+                                      body.data?.id || 
+                                      body.data?.attributes?.subscription_id ||
+                                      body.data?.attributes?.id;
+        
+        if (canceledSubscriptionId) {
+          try {
+            // Cancel subscription in Paddle and sync to our database
+            await subscriptionService.cancelSubscription(canceledSubscriptionId);
+            console.log(`Subscription cancelled for user ${userId}`);
+          } catch (error) {
+            console.error('Error canceling subscription:', error);
+          }
+        } else {
+          // Fallback to updating user directly if we can't find the subscription ID
+          await User.findByIdAndUpdate(userId, { 
+            subscriptionStatus: 'cancelled',
+            quotesEnabled: false,
+            isPay: false
+          });
+          console.log(`Subscription cancelled for user ${userId} (fallback method)`);
+        }
         break;
         
-      case 'subscription.updated':
-        // When a subscription is updated
-        const status = body.data.status;
-        console.log(`Processing subscription update for user ${userId} to status: ${status}`);
-        await User.findByIdAndUpdate(userId, { 
-          subscriptionStatus: status,
-          quotesEnabled: status === 'active',
-          isPay: status === 'active'
-        });
-        console.log(`Subscription updated for user ${userId}`);
+      case 'subscription.paused':
+        // When a subscription is paused
+        console.log(`Processing subscription pause for user ${userId}`);
+        
+        const pausedSubscriptionId = body.data?.subscription_id || 
+                                    body.data?.id || 
+                                    body.data?.attributes?.subscription_id ||
+                                    body.data?.attributes?.id;
+        
+        if (pausedSubscriptionId) {
+          try {
+            // Pause subscription in Paddle and sync to our database
+            await subscriptionService.pauseSubscription(pausedSubscriptionId);
+            console.log(`Subscription paused for user ${userId}`);
+          } catch (error) {
+            console.error('Error pausing subscription:', error);
+          }
+        } else {
+          // Fallback to updating user directly if we can't find the subscription ID
+          await User.findByIdAndUpdate(userId, { 
+            subscriptionStatus: 'paused',
+            quotesEnabled: false,
+            isPay: false
+          });
+          console.log(`Subscription paused for user ${userId} (fallback method)`);
+        }
+        break;
+        
+      case 'subscription.resumed':
+        // When a subscription is resumed
+        console.log(`Processing subscription resume for user ${userId}`);
+        
+        const resumedSubscriptionId = body.data?.subscription_id || 
+                                     body.data?.id || 
+                                     body.data?.attributes?.subscription_id ||
+                                     body.data?.attributes?.id;
+        
+        if (resumedSubscriptionId) {
+          try {
+            // Resume subscription in Paddle and sync to our database
+            await subscriptionService.resumeSubscription(resumedSubscriptionId);
+            console.log(`Subscription resumed for user ${userId}`);
+          } catch (error) {
+            console.error('Error resuming subscription:', error);
+          }
+        } else {
+          // Fallback to updating user directly if we can't find the subscription ID
+          await User.findByIdAndUpdate(userId, { 
+            subscriptionStatus: 'active',
+            quotesEnabled: true,
+            isPay: true
+          });
+          console.log(`Subscription resumed for user ${userId} (fallback method)`);
+        }
         break;
         
       default:
@@ -307,7 +387,10 @@ router.get('/status', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Check if the user has a subscription
+    // Get active subscription for the user
+    const activeSubscription = await subscriptionService.getActiveSubscription(req.user.id);
+    
+    // If user has a subscription ID, fetch details from Paddle API
     let cardBrand = "";
     let cardLastFour = "";
     let customerPortalUrl = "";
@@ -315,15 +398,14 @@ router.get('/status', auth, async (req, res) => {
     let subscriptionDetails = null;
     let paddleError = null;
     
-    // If user has a subscription ID, fetch card details and URLs from Paddle API
-    if (user.subscriptionId) {
+    if (activeSubscription) {
       try {
-        console.log('Fetching subscription details from Paddle for ID:', user.subscriptionId);
-        const response = await paddleApi.get(`/subscriptions/${user.subscriptionId}`);
+        console.log('Fetching subscription details from Paddle for ID:', activeSubscription.paddleSubscriptionId);
+        const paddleSubscription = await subscriptionService.getSubscription(activeSubscription.paddleSubscriptionId);
         
         // Check if response follows Paddle's API format
-        if (response.data && response.data.data) {
-          const subData = response.data.data;
+        if (paddleSubscription && paddleSubscription.data) {
+          const subData = paddleSubscription.data;
           console.log('Received subscription data from Paddle:', subData);
           
           subscriptionDetails = subData;
@@ -335,8 +417,8 @@ router.get('/status', auth, async (req, res) => {
           }
           
           // Extract URLs from the response
-          customerPortalUrl = subData.customer_portal_url || "";
-          cancelSubscriptionUrl = subData.cancel_url || "";
+          customerPortalUrl = subData.management_urls?.update_payment_method || "";
+          cancelSubscriptionUrl = subData.management_urls?.cancel || "";
           
           // Update user's payment status based on Paddle's status
           const paddleStatus = subData.status;
@@ -356,7 +438,7 @@ router.get('/status', auth, async (req, res) => {
             user.quotesEnabled = paddleStatus === 'active';
           }
         } else {
-          console.error('Invalid Paddle API response format:', response.data);
+          console.error('Invalid Paddle API response format:', paddleSubscription);
           paddleError = 'Invalid response from payment system';
         }
       } catch (err) {
@@ -411,8 +493,6 @@ router.get('/status', auth, async (req, res) => {
     });
   }
 });
-
-
 
 // Raw webhook debug endpoint - logs all incoming webhook data without verification
 router.post('/webhook-debug', async (req, res) => {
@@ -508,7 +588,6 @@ router.post('/webhook-debug', async (req, res) => {
     return res.status(200).json({ received: true, error: error.message }); // Still return 200 to avoid retries
   }
 });
-
 
 // Debug endpoint to check a user's payment status (for admin debugging only)
 router.get('/debug-user-status', async (req, res) => {
