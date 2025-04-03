@@ -714,8 +714,8 @@ router.post('/update-user-data', auth, async (req, res) => {
         subscriptionStatus: subscriptionStatus || 'active',
         isPay: true,
         quotesEnabled: true,
-        paymentUpdatedAt: new Date(),
-        ...(cardInfo && {
+        paymentUpdatedAt: new Date(), 
+        ...(cardBrand && cardLastFour && {
           cardBrand: cardBrand,
           cardLastFour: cardLastFour
         })
