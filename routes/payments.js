@@ -228,15 +228,8 @@ router.post('/webhook', async (req, res) => {
           }
         }
         
-        // Format subscription ID to ensure it starts with 'sub_'
-        if (!subscriptionId.startsWith('sub_')) {
-          subscriptionId = `sub_${subscriptionId}`;
-          console.log(`Formatted subscription ID to ${subscriptionId}`);
-        } else if (subscriptionId.startsWith('sub_sub_')) {
-          // Fix double-prefixed subscription IDs
-          subscriptionId = subscriptionId.replace('sub_sub_', 'sub_');
-          console.log(`Fixed double-prefixed subscription ID from ${subscriptionId} to ${subscriptionId}`);
-        }
+        // Use the subscription ID as is, without adding any prefix
+        console.log(`Using subscription ID: ${subscriptionId}`);
         
         // Validate subscription ID format
         if (typeof subscriptionId !== 'string' || subscriptionId.trim().length === 0) {
@@ -709,16 +702,9 @@ router.post('/update-user-data', auth, async (req, res) => {
       return res.status(400).json({ error: 'Subscription ID is required' });
     }
     
-    // Format subscription ID to ensure it starts with 'sub_'
-    let formattedSubscriptionId = subscriptionId;
-    if (!subscriptionId.startsWith('sub_')) {
-      formattedSubscriptionId = `sub_${subscriptionId}`;
-      console.log(`Formatted subscription ID from ${subscriptionId} to ${formattedSubscriptionId}`);
-    } else if (subscriptionId.startsWith('sub_sub_')) {
-      // Fix double-prefixed subscription IDs
-      formattedSubscriptionId = subscriptionId.replace('sub_sub_', 'sub_');
-      console.log(`Fixed double-prefixed subscription ID from ${subscriptionId} to ${formattedSubscriptionId}`);
-    }
+    // Use the subscription ID as is, without adding any prefix
+    const formattedSubscriptionId = subscriptionId;
+    console.log(`Using subscription ID: ${formattedSubscriptionId}`);
     
     // Update user's subscription data
     const user = await User.findByIdAndUpdate(

@@ -61,16 +61,9 @@ const processSuccessfulPayment = async (userId, subscriptionId) => {
       subscriptionId: existingUser.subscriptionId
     });
     
-    // Format subscription ID to ensure it starts with 'sub_'
-    let formattedSubscriptionId = subscriptionId;
-    if (subscriptionId && !subscriptionId.startsWith('sub_')) {
-      formattedSubscriptionId = `sub_${subscriptionId}`;
-      console.log(`Formatted subscription ID from ${subscriptionId} to ${formattedSubscriptionId}`);
-    } else if (subscriptionId && subscriptionId.startsWith('sub_sub_')) {
-      // Fix double-prefixed subscription IDs
-      formattedSubscriptionId = subscriptionId.replace('sub_sub_', 'sub_');
-      console.log(`Fixed double-prefixed subscription ID from ${subscriptionId} to ${formattedSubscriptionId}`);
-    }
+    // Use the subscription ID as is, without adding any prefix
+    const formattedSubscriptionId = subscriptionId;
+    console.log(`Using subscription ID: ${formattedSubscriptionId}`);
     
     // Update user payment status and complete registration
     const updateData = {
@@ -210,16 +203,9 @@ const verifySubscriptionStatus = async (subscriptionId) => {
     throw new Error('Missing Paddle API key');
   }
 
-  // Format subscription ID to ensure it starts with 'sub_'
-  let formattedSubscriptionId = subscriptionId;
-  if (!subscriptionId.startsWith('sub_')) {
-    formattedSubscriptionId = `sub_${subscriptionId}`;
-    console.log(`Formatted subscription ID from ${subscriptionId} to ${formattedSubscriptionId}`);
-  } else if (subscriptionId.startsWith('sub_sub_')) {
-    // Fix double-prefixed subscription IDs
-    formattedSubscriptionId = subscriptionId.replace('sub_sub_', 'sub_');
-    console.log(`Fixed double-prefixed subscription ID from ${subscriptionId} to ${formattedSubscriptionId}`);
-  }
+  // Use the subscription ID as is, without adding any prefix
+  const formattedSubscriptionId = subscriptionId;
+  console.log(`Using subscription ID: ${formattedSubscriptionId}`);
 
   const maxRetries = 3;
   let retryCount = 0;

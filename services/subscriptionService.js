@@ -19,18 +19,10 @@ const paddleApi = axios.create({
  */
 const getSubscription = async (paddleId) => {
   try {
-    // Format subscription ID to ensure it starts with 'sub_'
-    let formattedPaddleId = paddleId;
-    if (!paddleId.startsWith('sub_')) {
-      formattedPaddleId = `sub_${paddleId}`;
-      console.log(`Formatted subscription ID from ${paddleId} to ${formattedPaddleId}`);
-    } else if (paddleId.startsWith('sub_sub_')) {
-      // Fix double-prefixed subscription IDs
-      formattedPaddleId = paddleId.replace('sub_sub_', 'sub_');
-      console.log(`Fixed double-prefixed subscription ID from ${paddleId} to ${formattedPaddleId}`);
-    }
+    // Use the subscription ID as is, without adding any prefix
+    console.log(`Using subscription ID: ${paddleId}`);
     
-    const response = await paddleApi.get(`/subscriptions/${formattedPaddleId}`);
+    const response = await paddleApi.get(`/subscriptions/${paddleId}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching subscription ${paddleId}:`, error.message);
