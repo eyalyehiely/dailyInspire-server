@@ -42,14 +42,18 @@ const webhookLogger = (req, res, next) => {
         fs.writeFileSync(logFile, JSON.stringify(logData, null, 2));
         
         console.log(`Webhook request logged to ${logFile}`);
+        
+        // Call next() inside the end event handler
+        next();
       } catch (error) {
         console.error('Error logging webhook:', error);
+        next(error);
       }
     });
+  } else {
+    // For non-webhook routes, just continue
+    next();
   }
-  
-  // Continue processing the request
-  next();
 };
 
 module.exports = webhookLogger; 

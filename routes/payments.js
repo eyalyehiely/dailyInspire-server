@@ -114,6 +114,8 @@ router.post('/webhook', async (req, res) => {
   try {
     console.log('===== WEBHOOK RECEIVED =====');
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('Raw Body:', req.rawBody);
+    console.log('Parsed Body:', req.body);
     
     // Verify webhook signature from Paddle
     const signature = req.headers['x-paddle-signature'];
@@ -141,6 +143,7 @@ router.post('/webhook', async (req, res) => {
     let body;
     try {
       body = JSON.parse(rawBody);
+      console.log('Parsed webhook body:', JSON.stringify(body, null, 2));
     } catch (error) {
       console.error('Failed to parse webhook body:', error);
       return res.status(400).json({ error: 'Invalid JSON body' });
@@ -151,6 +154,8 @@ router.post('/webhook', async (req, res) => {
       console.error('Missing event_type in webhook body');
       return res.status(400).json({ error: 'Missing event_type' });
     }
+    
+    console.log(`Processing webhook event: ${eventType}`);
     
     // Log the incoming webhook for debugging
     console.log(`Received Paddle webhook: ${eventType}`);
