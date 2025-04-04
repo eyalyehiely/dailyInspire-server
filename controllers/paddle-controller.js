@@ -46,7 +46,8 @@ const verifyWebhookSignature = (signature, body) => {
     const calculatedSignature = hmac.digest('hex');
     
     console.log('Verifying webhook signature:');
-    console.log('Timestamp:', timestamp);
+    console.log('Raw body:', body);
+    console.log('Timestamp from signature:', timestamp);
     console.log('Received signature:', receivedSignature);
     console.log('Calculated signature:', calculatedSignature);
     console.log('Raw body length:', body.length);
