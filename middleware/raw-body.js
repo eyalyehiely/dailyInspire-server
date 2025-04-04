@@ -3,7 +3,8 @@ const bodyParser = require('body-parser');
 const rawBody = bodyParser.raw({
   type: 'application/json',
   verify: (req, res, buf) => {
-    req.rawBody = buf.toString();
+    // Store the raw buffer as a string
+    req.rawBody = buf.toString('utf8');
   }
 });
 

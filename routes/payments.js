@@ -136,15 +136,13 @@ router.post('/webhook', async (req, res) => {
       return res.status(401).json({ error: 'Invalid signature' });
     }
     
-    // Use the parsed body if available, otherwise parse it
-    let body = req.body;
-    if (!body || Object.keys(body).length === 0) {
-      try {
-        body = JSON.parse(rawBody);
-      } catch (error) {
-        console.error('Failed to parse webhook body:', error);
-        return res.status(400).json({ error: 'Invalid JSON body' });
-      }
+    // Parse the body after verification
+    let body;
+    try {
+      body = JSON.parse(rawBody);
+    } catch (error) {
+      console.error('Failed to parse webhook body:', error);
+      return res.status(400).json({ error: 'Invalid JSON body' });
     }
     
     console.log('Webhook body:', JSON.stringify(body, null, 2));
