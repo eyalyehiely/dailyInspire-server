@@ -3,26 +3,27 @@
  */
 const fs = require('fs');
 const path = require('path');
-const getRawBody = require('raw-body');
 
 const webhookLogger = (req, res, next) => {
   // Only process webhook endpoints
   if (req.path.includes('/webhook')) {
-    // Get the raw body
-    getRawBody(req, {
-      length: req.headers['content-length'],
-      limit: '1mb',
-      encoding: 'utf8'
-    }, function(err, string) {
-      if (err) {
-        console.error('Error reading raw body:', err);
-        return next(err);
-      }
-
-      // Store the raw body for webhook signature verification
-      req.rawBody = string;
-      
+    // Create a buffer to store the raw body
+    const chunks = [];
+    
+    // Listen for data events
+    req.on('data', chunk => {
+      chunks.push(chunk);
+    });
+    
+    // When all data is received
+    req.on('end', () => {
       try {
+        // Combine chunks into a single buffer
+        const rawBody = Buffer.concat(chunks).toString('utf8');
+        
+        // Store the raw body for webhook signature verification
+        req.rawBody = rawBody;
+        
         // Create logs directory if it doesn't exist
         const logDir = path.join(__dirname, '../logs');
         if (!fs.existsSync(logDir)) {
@@ -37,8 +38,7 @@ const webhookLogger = (req, res, next) => {
           method: req.method,
           headers: req.headers,
           query: req.query,
-          rawBody: string,
-          // The parsed body will be added by Express later
+          rawBody: rawBody
         };
         
         // Write to file
@@ -47,12 +47,24 @@ const webhookLogger = (req, res, next) => {
         
         console.log(`Webhook request logged to ${logFile}`);
         
-        // Call next() inside the callback
+        // Parse the body for the next middleware
+        try {
+          req.body = JSON.parse(rawBody);
+        } catch (parseError) {
+          console.error('Error parsing webhook body:', parseError);
+        }
+        
         next();
       } catch (error) {
-        console.error('Error logging webhook:', error);
+        console.error('Error in webhook logger:', error);
         next(error);
       }
+    });
+    
+    // Handle errors
+    req.on('error', error => {
+      console.error('Error reading webhook request:', error);
+      next(error);
     });
   } else {
     // For non-webhook routes, just continue
