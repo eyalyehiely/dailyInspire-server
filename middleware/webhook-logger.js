@@ -3,20 +3,24 @@
  */
 const fs = require('fs');
 const path = require('path');
+const getRawBody = require('raw-body');
 
 const webhookLogger = (req, res, next) => {
   // Only process webhook endpoints
   if (req.path.includes('/webhook')) {
-    // Capture the raw body data
-    let rawData = '';
-    
-    req.on('data', chunk => {
-      rawData += chunk;
-    });
-    
-    req.on('end', () => {
+    // Get the raw body
+    getRawBody(req, {
+      length: req.headers['content-length'],
+      limit: '1mb',
+      encoding: 'utf8'
+    }, function(err, string) {
+      if (err) {
+        console.error('Error reading raw body:', err);
+        return next(err);
+      }
+
       // Store the raw body for webhook signature verification
-      req.rawBody = rawData;
+      req.rawBody = string;
       
       try {
         // Create logs directory if it doesn't exist
@@ -33,7 +37,7 @@ const webhookLogger = (req, res, next) => {
           method: req.method,
           headers: req.headers,
           query: req.query,
-          rawBody: rawData,
+          rawBody: string,
           // The parsed body will be added by Express later
         };
         
@@ -43,7 +47,7 @@ const webhookLogger = (req, res, next) => {
         
         console.log(`Webhook request logged to ${logFile}`);
         
-        // Call next() inside the end event handler
+        // Call next() inside the callback
         next();
       } catch (error) {
         console.error('Error logging webhook:', error);
