@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User')
 const { fetchDailyQuote, sendQuoteEmail } = require('../controllers/quote-sender');
+const auth = require('../middleware/auth');
 
 //testing send quote to user
 router.post('/send-quote', async (req, res) => {
@@ -68,5 +69,5 @@ router.post('/test-emails', auth, async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
   });
-  
+
 module.exports = router;
