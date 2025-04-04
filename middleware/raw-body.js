@@ -1,11 +1,10 @@
-const rawBody = (req, res, next) => {
-  req.rawBody = '';
-  req.on('data', chunk => {
-    req.rawBody += chunk;
-  });
-  req.on('end', () => {
-    next();
-  });
-};
+const bodyParser = require('body-parser');
+
+const rawBody = bodyParser.raw({
+  type: 'application/json',
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString();
+  }
+});
 
 module.exports = rawBody; 
