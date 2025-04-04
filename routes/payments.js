@@ -129,12 +129,18 @@ router.post('/webhook', async (req, res) => {
       return res.status(401).json({ error: 'Missing signature' });
     }
     
+    console.log('Received Paddle-Signature:', signature);
+    
     // Verify the signature with the raw body string
     const isSignatureValid = verifyWebhookSignature(signature, rawBody);
+    console.log('Signature validation result:', isSignatureValid ? 'VALID' : 'INVALID');
+    
     if (!isSignatureValid) {
       console.error('Invalid webhook signature');
       return res.status(401).json({ error: 'Invalid signature' });
     }
+    
+    console.log('✅ Webhook signature verified successfully');
     
     // Parse the body after verification
     let body;
@@ -147,13 +153,16 @@ router.post('/webhook', async (req, res) => {
     
     console.log('Webhook body:', JSON.stringify(body, null, 2));
     
+    // Extract event_type and event_id for tracking
     const eventType = body.event_type;
+    const eventId = body.event_id;
+    
     if (!eventType) {
       console.error('Missing event_type in webhook body');
       return res.status(400).json({ error: 'Missing event_type' });
     }
     
-    console.log(`Processing webhook event: ${eventType}`);
+    console.log(`Processing webhook event: ${eventType} (ID: ${eventId || 'unknown'})`);
     
     // Log the incoming webhook for debugging
     console.log(`Received Paddle webhook: ${eventType}`);

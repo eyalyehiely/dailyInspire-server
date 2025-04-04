@@ -21,28 +21,45 @@ const verifyWebhookSignature = (signature, body) => {
   }
 
   try {
-    // Extract the h1 part from the signature
+    // Extract the timestamp and h1 part from the signature
+    const tsMatch = signature.match(/ts=(\d+)/);
     const h1Match = signature.match(/h1=([a-f0-9]+)/);
-    if (!h1Match) {
-      console.error('Invalid signature format - missing h1 parameter');
+    
+    if (!tsMatch || !h1Match) {
+      console.error('Invalid signature format - missing ts or h1 parameter');
       return false;
     }
+    
+    const timestamp = tsMatch[1];
     const receivedSignature = h1Match[1];
-
+    
+    // Create the signed payload by concatenating timestamp + ":" + raw body
+    const signedPayload = `${timestamp}:${body}`;
+    
     // Create HMAC with the webhook secret
     const hmac = crypto.createHmac('sha256', process.env.PADDLE_WEBHOOK_SECRET);
     
-    // Update HMAC with the raw body string
-    hmac.update(body);
+    // Update HMAC with the signed payload
+    hmac.update(signedPayload);
     
     // Calculate the signature
     const calculatedSignature = hmac.digest('hex');
     
     console.log('Verifying webhook signature:');
+    console.log('Timestamp:', timestamp);
     console.log('Received signature:', receivedSignature);
     console.log('Calculated signature:', calculatedSignature);
     console.log('Raw body length:', body.length);
     console.log('Raw body first 100 chars:', body.substring(0, 100));
+    
+    // Optional: Check if the timestamp is not too old (prevent replay attacks)
+    // Paddle's SDK uses a default tolerance of 5 seconds
+    const now = Math.floor(Date.now() / 1000);
+    const timestampDiff = now - parseInt(timestamp);
+    if (timestampDiff > 300) { // 5 minutes tolerance
+      console.error(`Webhook timestamp is too old: ${timestampDiff} seconds`);
+      return false;
+    }
     
     return calculatedSignature === receivedSignature;
   } catch (error) {
