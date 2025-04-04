@@ -32,7 +32,7 @@ const verifyWebhookSignature = (signature, body) => {
     // Create HMAC with the webhook secret
     const hmac = crypto.createHmac('sha256', process.env.PADDLE_WEBHOOK_SECRET);
     
-    // Update HMAC with the raw body buffer
+    // Update HMAC with the raw body string
     hmac.update(body);
     
     // Calculate the signature
@@ -42,7 +42,7 @@ const verifyWebhookSignature = (signature, body) => {
     console.log('Received signature:', receivedSignature);
     console.log('Calculated signature:', calculatedSignature);
     console.log('Raw body length:', body.length);
-    console.log('Raw body first 100 chars:', body.toString('utf8').substring(0, 100));
+    console.log('Raw body first 100 chars:', body.substring(0, 100));
     
     return calculatedSignature === receivedSignature;
   } catch (error) {

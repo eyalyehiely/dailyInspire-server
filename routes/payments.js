@@ -115,7 +115,7 @@ router.post('/webhook', async (req, res) => {
     console.log('===== WEBHOOK RECEIVED =====');
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
     
-    // Get the raw body buffer
+    // Get the raw body string
     const rawBody = req.rawBody;
     if (!rawBody) {
       console.error('Raw body not available');
@@ -129,7 +129,7 @@ router.post('/webhook', async (req, res) => {
       return res.status(401).json({ error: 'Missing signature' });
     }
     
-    // Verify the signature with the raw body buffer
+    // Verify the signature with the raw body string
     const isSignatureValid = verifyWebhookSignature(signature, rawBody);
     if (!isSignatureValid) {
       console.error('Invalid webhook signature');
@@ -139,7 +139,7 @@ router.post('/webhook', async (req, res) => {
     // Parse the body after verification
     let body;
     try {
-      body = JSON.parse(rawBody.toString('utf8'));
+      body = JSON.parse(rawBody);
     } catch (error) {
       console.error('Failed to parse webhook body:', error);
       return res.status(400).json({ error: 'Invalid JSON body' });
