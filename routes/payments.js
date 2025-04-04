@@ -98,6 +98,7 @@ router.get('/checkout-info', auth, async (req, res) => {
     };
     
     console.log("Sending checkout info to client:", responseData);
+    console.log('Final response being sent:', JSON.stringify(responseData, null, 2));
     return res.json(responseData);
   } catch (error) {
     console.error('Error in checkout-info route:', error);
@@ -532,8 +533,8 @@ router.get('/status', auth, async (req, res) => {
       quotesEnabled: user.quotesEnabled,
       subscriptionStatus: user.subscriptionStatus,
       subscriptionId: user.subscriptionId,
-      cardBrand: cardBrand || user.cardBrand || "",
-      cardLastFour: cardLastFour || user.cardLastFour || "",
+      cardBrand: user.cardBrand || "",
+      cardLastFour: user.cardLastFour || "",
       customerPortalUrl,
       cancelSubscriptionUrl,
       subscriptionDetails,
@@ -546,6 +547,7 @@ router.get('/status', auth, async (req, res) => {
       cardLastFour: response.cardLastFour
     });
     
+    console.log('Final response being sent:', JSON.stringify(response, null, 2));
     return res.json(response);
   } catch (error) {
     console.error('Error checking payment status:', error);
