@@ -21,10 +21,23 @@ const verifyWebhookSignature = (signature, body) => {
   }
 
   try {
+    // Extract the h1 part from the signature
+    const h1Match = signature.match(/h1=([a-f0-9]+)/);
+    if (!h1Match) {
+      console.error('Invalid signature format - missing h1 parameter');
+      return false;
+    }
+    const receivedSignature = h1Match[1];
+
     const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
     const hmac = crypto.createHmac('sha256', process.env.PADDLE_WEBHOOK_SECRET);
     const calculatedSignature = hmac.update(bodyString).digest('hex');
-    return calculatedSignature === signature;
+    
+    console.log('Verifying webhook signature:');
+    console.log('Received signature:', receivedSignature);
+    console.log('Calculated signature:', calculatedSignature);
+    
+    return calculatedSignature === receivedSignature;
   } catch (error) {
     console.error('Error verifying webhook signature:', error);
     return false;

@@ -723,6 +723,13 @@ router.post('/update-user-data', auth, async (req, res) => {
   try {
     const { subscriptionId, subscriptionStatus, cardBrand, cardLastFour, firstPaymentDate, nextPaymentDate } = req.body;
     
+    console.log('Received update-user-data request with card details:', {
+      cardBrand,
+      cardLastFour,
+      subscriptionId,
+      subscriptionStatus
+    });
+    
     if (!subscriptionId) {
       return res.status(400).json({ error: 'Subscription ID is required' });
     }
@@ -740,27 +747,36 @@ router.post('/update-user-data', auth, async (req, res) => {
     calculatedNextPaymentDate.setMonth(calculatedNextPaymentDate.getMonth() + 1);
     
     // Update user's subscription data
+    const updateData = {
+      subscriptionId: formattedSubscriptionId,
+      subscriptionStatus: subscriptionStatus || 'active',
+      isPay: true,
+      quotesEnabled: true,
+      isRegistrationComplete: true,
+      paymentUpdatedAt: new Date(),
+      cardBrand: cardBrand,
+      cardLastFour: cardLastFour,
+      'lastCheckoutAttempt.firstPaymentDate': firstPaymentDate || israelTime,
+      'lastCheckoutAttempt.nextPaymentDate': nextPaymentDate || calculatedNextPaymentDate,
+      'lastCheckoutAttempt.timestamp': new Date()
+    };
+    
+    console.log('Updating user with data:', updateData);
+    
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      {
-        subscriptionId: formattedSubscriptionId,
-        subscriptionStatus: subscriptionStatus || 'active',
-        isPay: true,
-        quotesEnabled: true,
-        isRegistrationComplete: true,
-        paymentUpdatedAt: new Date(),
-        cardBrand: cardBrand,
-        cardLastFour: cardLastFour,
-        'lastCheckoutAttempt.firstPaymentDate': firstPaymentDate || israelTime,
-        'lastCheckoutAttempt.nextPaymentDate': nextPaymentDate || calculatedNextPaymentDate,
-        'lastCheckoutAttempt.timestamp': new Date()
-      },
+      updateData,
       { new: true }
     );
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+    
+    console.log('User updated successfully with card details:', {
+      cardBrand: user.cardBrand,
+      cardLastFour: user.cardLastFour
+    });
     
     return res.json({
       success: true,
