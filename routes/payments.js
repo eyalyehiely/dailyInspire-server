@@ -123,7 +123,7 @@ router.post('/webhook', async (req, res) => {
     }
     
     // Verify webhook signature from Paddle
-    const signature = req.headers['x-paddle-signature'];
+    const signature = req.headers['paddle-signature'];
     if (!signature) {
       console.error('Missing webhook signature');
       return res.status(401).json({ error: 'Missing signature' });
