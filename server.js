@@ -24,13 +24,12 @@ app.use(cors({
   credentials: true
 }));
 
-// Add webhook logger middleware BEFORE body parsing
-const webhookLogger = require('./middleware/webhook-logger');
-app.use(webhookLogger);
-
 // Parse JSON and URL-encoded bodies
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// Add webhook logger middleware AFTER body parsing
+const webhookLogger = require('./middleware/webhook-logger');
+app.use(webhookLogger);
 
 // Call this before setting up routes
 connectDB();
