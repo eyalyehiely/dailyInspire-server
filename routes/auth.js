@@ -186,7 +186,9 @@ router.get('/preferences', auth, async (req, res) => {
         last_name: user.last_name,
         preferredTime: user.preferredTime,
         timezone: user.timezone,
-        quotesEnabled: user.quotesEnabled
+        quotesEnabled: user.quotesEnabled,
+        cardBrand: user.cardBrand,
+        cardLastFour: user.cardLastFour
       }
     });
   } catch (error) {
