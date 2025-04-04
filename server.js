@@ -24,12 +24,11 @@ app.use(cors({
   credentials: true
 }));
 
-// Add webhook logger middleware BEFORE JSON parsing
-// This is crucial for capturing the raw body for webhook signature verification
+// Add webhook logger middleware BEFORE body parsing
 const webhookLogger = require('./middleware/webhook-logger');
 app.use(webhookLogger);
 
-// Only parse JSON after webhook logger has captured raw body
+// Parse JSON and URL-encoded bodies
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

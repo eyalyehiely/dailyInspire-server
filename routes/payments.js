@@ -114,8 +114,13 @@ router.post('/webhook', async (req, res) => {
   try {
     console.log('===== WEBHOOK RECEIVED =====');
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
-    console.log('Raw Body:', req.rawBody);
-    console.log('Parsed Body:', req.body);
+    
+    // Get the raw body string
+    const rawBody = req.rawBody;
+    if (!rawBody) {
+      console.error('Raw body not available');
+      return res.status(400).json({ error: 'Raw body not available' });
+    }
     
     // Verify webhook signature from Paddle
     const signature = req.headers['x-paddle-signature'];
@@ -124,30 +129,25 @@ router.post('/webhook', async (req, res) => {
       return res.status(401).json({ error: 'Missing signature' });
     }
     
-    // Get the raw body string - this should be available from body-parser raw
-    const rawBody = req.rawBody;
-    if (!rawBody) {
-      console.error('Raw body not available - body-parser raw middleware may not be configured');
-      return res.status(400).json({ error: 'Raw body not available' });
-    }
-    
     // Verify the signature with the raw body
     const isSignatureValid = verifyWebhookSignature(signature, rawBody);
-    
     if (!isSignatureValid) {
       console.error('Invalid webhook signature');
       return res.status(401).json({ error: 'Invalid signature' });
     }
     
-    // Parse the body
-    let body;
-    try {
-      body = JSON.parse(rawBody);
-      console.log('Parsed webhook body:', JSON.stringify(body, null, 2));
-    } catch (error) {
-      console.error('Failed to parse webhook body:', error);
-      return res.status(400).json({ error: 'Invalid JSON body' });
+    // Use the parsed body if available, otherwise parse it
+    let body = req.body;
+    if (!body || Object.keys(body).length === 0) {
+      try {
+        body = JSON.parse(rawBody);
+      } catch (error) {
+        console.error('Failed to parse webhook body:', error);
+        return res.status(400).json({ error: 'Invalid JSON body' });
+      }
     }
+    
+    console.log('Webhook body:', JSON.stringify(body, null, 2));
     
     const eventType = body.event_type;
     if (!eventType) {
