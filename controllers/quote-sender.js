@@ -190,7 +190,9 @@ async function sendQuotesToAllUsers() {
 // Export both functions
 module.exports = { 
   sendQuotesToAllUsers,
-  sendQuotesToUsersForCurrentTime 
+  sendQuotesToUsersForCurrentTime,
+  fetchDailyQuote,
+  sendQuoteEmail
 };
 
 // If run directly (for testing)

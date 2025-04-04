@@ -251,6 +251,51 @@ const getActiveSubscription = async (userId) => {
   }
 };
 
+/**
+ * Update next payment date for active subscriptions
+ * @returns {Promise<void>}
+ */
+const updateNextPaymentDates = async () => {
+  try {
+    console.log('Starting next payment date update process...');
+    
+    // Get current date in Israel timezone
+    const now = new Date();
+    const israelTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+    
+    // Find all users with active subscriptions
+    const users = await User.find({
+      subscriptionStatus: 'active',
+      'lastCheckoutAttempt.nextPaymentDate': { $lt: israelTime }
+    });
+    
+    console.log(`Found ${users.length} users to update next payment date`);
+    
+    for (const user of users) {
+      try {
+        // Calculate new next payment date (same date next month)
+        const newNextPaymentDate = new Date(user.lastCheckoutAttempt.nextPaymentDate);
+        newNextPaymentDate.setMonth(newNextPaymentDate.getMonth() + 1);
+        
+        // Update user's next payment date
+        await User.findByIdAndUpdate(user._id, {
+          'lastCheckoutAttempt.nextPaymentDate': newNextPaymentDate,
+          'lastCheckoutAttempt.timestamp': new Date()
+        });
+        
+        console.log(`Updated next payment date for user ${user.email} to ${newNextPaymentDate}`);
+      } catch (error) {
+        console.error(`Error updating next payment date for user ${user.email}:`, error);
+      }
+    }
+    
+    console.log('Next payment date update process completed');
+  } catch (error) {
+    console.error('Error in updateNextPaymentDates:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   getSubscription,
   syncSubscription,
@@ -259,5 +304,6 @@ module.exports = {
   resumeSubscription,
   getUpdatePaymentMethodUrl,
   getUserSubscriptions,
-  getActiveSubscription
+  getActiveSubscription,
+  updateNextPaymentDates
 }; 

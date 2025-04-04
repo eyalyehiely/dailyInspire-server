@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const { sendQuotesToUsersForCurrentTime } = require('./quote-sender');
+const { updateNextPaymentDates } = require('../services/subscriptionService');
 const { exec } = require('child_process');
 const path = require('path');
 
@@ -7,6 +8,18 @@ const path = require('path');
 cron.schedule('* * * * *', async () => {
   console.log('Checking for users who should receive quotes now...');
   await sendQuotesToUsersForCurrentTime();
+});
+
+// Update next payment dates daily at midnight Israel time
+cron.schedule('0 0 * * *', async () => {
+  console.log('Running scheduled task: updateNextPaymentDates');
+  try {
+    await updateNextPaymentDates();
+  } catch (error) {
+    console.error('Error in scheduled updateNextPaymentDates task:', error);
+  }
+}, {
+  timezone: 'Asia/Jerusalem'
 });
 
 // Run daily at midnight to check for incomplete payments

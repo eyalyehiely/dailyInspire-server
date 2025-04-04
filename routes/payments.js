@@ -716,7 +716,7 @@ router.post('/admin/force-upgrade', async (req, res) => {
 // Route to update user payment data
 router.post('/update-user-data', auth, async (req, res) => {
   try {
-    const { subscriptionId, subscriptionStatus, cardBrand, cardLastFour } = req.body;
+    const { subscriptionId, subscriptionStatus, cardBrand, cardLastFour, firstPaymentDate, nextPaymentDate } = req.body;
     
     if (!subscriptionId) {
       return res.status(400).json({ error: 'Subscription ID is required' });
@@ -725,6 +725,14 @@ router.post('/update-user-data', auth, async (req, res) => {
     // Use the subscription ID as is, without adding any prefix
     const formattedSubscriptionId = subscriptionId;
     console.log(`Using subscription ID: ${formattedSubscriptionId}`);
+    
+    // Get current date in Israel timezone
+    const now = new Date();
+    const israelTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+    
+    // Calculate next payment date (same date next month)
+    const calculatedNextPaymentDate = new Date(israelTime);
+    calculatedNextPaymentDate.setMonth(calculatedNextPaymentDate.getMonth() + 1);
     
     // Update user's subscription data
     const user = await User.findByIdAndUpdate(
@@ -735,10 +743,13 @@ router.post('/update-user-data', auth, async (req, res) => {
         isPay: true,
         quotesEnabled: true,
         isRegistrationComplete: true,
-        paymentUpdatedAt: new Date(), 
+        paymentUpdatedAt: new Date(),
         cardBrand: cardBrand,
-        cardLastFour: cardLastFour
-        },
+        cardLastFour: cardLastFour,
+        'lastCheckoutAttempt.firstPaymentDate': firstPaymentDate || israelTime,
+        'lastCheckoutAttempt.nextPaymentDate': nextPaymentDate || calculatedNextPaymentDate,
+        'lastCheckoutAttempt.timestamp': new Date()
+      },
       { new: true }
     );
     
@@ -756,7 +767,9 @@ router.post('/update-user-data', auth, async (req, res) => {
         quotesEnabled: user.quotesEnabled,
         isRegistrationComplete: user.isRegistrationComplete,
         cardBrand: user.cardBrand,
-        cardLastFour: user.cardLastFour
+        cardLastFour: user.cardLastFour,
+        firstPaymentDate: user.lastCheckoutAttempt?.firstPaymentDate,
+        nextPaymentDate: user.lastCheckoutAttempt?.nextPaymentDate
       }
     });
   } catch (error) {
