@@ -23,6 +23,20 @@ const getSubscription = async (paddleId) => {
     console.log(`Using subscription ID: ${paddleId}`);
     
     const response = await paddleApi.get(`/subscriptions/${paddleId}`);
+    
+    // Log payment information specifically
+    if (response.data && response.data.data) {
+      console.log('Paddle subscription response structure:', Object.keys(response.data.data));
+      
+      if (response.data.data.payment_information) {
+        console.log('Payment information keys:', Object.keys(response.data.data.payment_information));
+        console.log('Card brand:', response.data.data.payment_information.card_brand);
+        console.log('Last four:', response.data.data.payment_information.last_four);
+      } else {
+        console.log('No payment_information found in Paddle response');
+      }
+    }
+    
     return response.data;
   } catch (error) {
     console.error(`Error fetching subscription ${paddleId}:`, error.message);
@@ -51,6 +65,17 @@ const syncSubscription = async (paddleSubscription, userId) => {
       status: paddleSubscription.status,
       paymentInfo: paddleSubscription.payment_information
     });
+    
+    // Log specific payment fields 
+    if (paddleSubscription.payment_information) {
+      console.log('Payment information details:');
+      console.log('- Card brand:', paddleSubscription.payment_information.card_brand);
+      console.log('- Last four:', paddleSubscription.payment_information.last_four);
+      console.log('- Expiry month:', paddleSubscription.payment_information.expiry_month);
+      console.log('- Expiry year:', paddleSubscription.payment_information.expiry_year);
+    } else {
+      console.log('No payment information available in subscription data');
+    }
     
     const subscriptionData = {
       paddleSubscriptionId: paddleSubscription.id,
@@ -110,11 +135,35 @@ const syncSubscription = async (paddleSubscription, userId) => {
     }
     
     // Update user's subscription status
-    await User.findByIdAndUpdate(userId, {
+    const userUpdateData = {
       subscriptionId: paddleSubscription.id,
       subscriptionStatus: paddleSubscription.status,
       isPay: ['active', 'trialing'].includes(paddleSubscription.status),
-      paymentUpdatedAt: new Date()
+      paymentUpdatedAt: new Date(),
+      ...(paddleSubscription.payment_information?.card_brand && {
+        cardBrand: paddleSubscription.payment_information.card_brand
+      }),
+      ...(paddleSubscription.payment_information?.last_four && {
+        cardLastFour: paddleSubscription.payment_information.last_four
+      })
+    };
+    
+    console.log('Updating user with card details:', {
+      userId,
+      subscriptionId: paddleSubscription.id,
+      cardBrand: userUpdateData.cardBrand,
+      cardLastFour: userUpdateData.cardLastFour
+    });
+    
+    await User.findByIdAndUpdate(userId, userUpdateData);
+    
+    // Verify the user was updated properly
+    const updatedUser = await User.findById(userId);
+    console.log('User after update:', {
+      userId: updatedUser._id,
+      cardBrand: updatedUser.cardBrand,
+      cardLastFour: updatedUser.cardLastFour,
+      subscriptionStatus: updatedUser.subscriptionStatus
     });
     
     return subscription;
