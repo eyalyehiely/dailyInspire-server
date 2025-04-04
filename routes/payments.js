@@ -46,8 +46,8 @@ router.get('/checkout-info', auth, async (req, res) => {
       
       // Get additional subscription details from Paddle if available
       let subscriptionDetails = null;
-      // let cardBrand = "";
-      let cardLastFour = "";
+      let cardBrand = user.cardBrand;
+      let cardLastFour = user.cardLastFour;
       let customerPortalUrl = "";
       let cancelSubscriptionUrl = "";
       
@@ -533,8 +533,8 @@ router.get('/status', auth, async (req, res) => {
       quotesEnabled: user.quotesEnabled,
       subscriptionStatus: user.subscriptionStatus,
       subscriptionId: user.subscriptionId,
-      cardBrand: user.cardBrand || "",
-      cardLastFour: user.cardLastFour || "",
+      cardBrand: user.cardBrand,
+      cardLastFour: user.cardLastFour,
       customerPortalUrl,
       cancelSubscriptionUrl,
       subscriptionDetails,
