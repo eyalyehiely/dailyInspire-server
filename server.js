@@ -14,6 +14,7 @@ const completeRegistration = require('./middleware/completeRegistration');
 const passwordResetRoutes = require('./routes/password-reset');
 const contactRoutes = require('./routes/contact');
 const testingRoutes = require('./routes/testing');
+const rawBody = require('./middleware/raw-body');
 // Import and start the scheduler
 const { startScheduler } = require('./controllers/scheduler');
 
@@ -23,6 +24,9 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
+
+// Add raw body middleware for webhook verification
+app.use('/api/payments/webhook', rawBody);
 
 // Parse JSON and URL-encoded bodies
 app.use(express.json());
