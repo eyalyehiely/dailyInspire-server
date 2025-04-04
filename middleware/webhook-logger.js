@@ -14,8 +14,10 @@ const webhookLogger = (req, res, next) => {
     
     // Set a timeout for the request
     const timeout = setTimeout(() => {
-      console.error('Webhook request timeout');
-      res.status(408).json({ error: 'Request timeout' });
+      if (!res.headersSent) {
+        console.error('Webhook request timeout');
+        res.status(408).json({ error: 'Request timeout' });
+      }
     }, 10000); // 10 seconds timeout
     
     try {
@@ -49,8 +51,11 @@ const webhookLogger = (req, res, next) => {
       console.log('Request body length:', req.rawBody.length);
       console.log('Successfully parsed webhook body');
       
+      // Clear the timeout before proceeding
+      clearTimeout(timeout);
       next();
     } catch (error) {
+      // Clear the timeout in case of error
       clearTimeout(timeout);
       console.error('Error in webhook logger:', error);
       next(error);
