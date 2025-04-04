@@ -29,13 +29,20 @@ const verifyWebhookSignature = (signature, body) => {
     }
     const receivedSignature = h1Match[1];
 
-    const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
+    // Create HMAC with the webhook secret
     const hmac = crypto.createHmac('sha256', process.env.PADDLE_WEBHOOK_SECRET);
-    const calculatedSignature = hmac.update(bodyString).digest('hex');
+    
+    // Update HMAC with the raw body buffer
+    hmac.update(body);
+    
+    // Calculate the signature
+    const calculatedSignature = hmac.digest('hex');
     
     console.log('Verifying webhook signature:');
     console.log('Received signature:', receivedSignature);
     console.log('Calculated signature:', calculatedSignature);
+    console.log('Raw body length:', body.length);
+    console.log('Raw body first 100 chars:', body.toString('utf8').substring(0, 100));
     
     return calculatedSignature === receivedSignature;
   } catch (error) {
