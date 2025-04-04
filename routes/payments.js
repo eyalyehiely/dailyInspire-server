@@ -439,12 +439,17 @@ router.get('/status', auth, async (req, res) => {
     const activeSubscription = await subscriptionService.getActiveSubscription(req.user.id);
     
     // If user has a subscription ID, fetch details from Paddle API
-    let cardBrand = "";
-    let cardLastFour = "";
+    let cardBrand = user.cardBrand || "";
+    let cardLastFour = user.cardLastFour || "";
     let customerPortalUrl = "";
     let cancelSubscriptionUrl = "";
     let subscriptionDetails = null;
     let paddleError = null;
+    
+    console.log('User card details from database:', { 
+      cardBrand: user.cardBrand, 
+      cardLastFour: user.cardLastFour 
+    });
     
     if (activeSubscription) {
       try {
@@ -527,8 +532,8 @@ router.get('/status', auth, async (req, res) => {
       quotesEnabled: user.quotesEnabled,
       subscriptionStatus: user.subscriptionStatus,
       subscriptionId: user.subscriptionId,
-      cardBrand,
-      cardLastFour,
+      cardBrand: cardBrand || user.cardBrand || "",
+      cardLastFour: cardLastFour || user.cardLastFour || "",
       customerPortalUrl,
       cancelSubscriptionUrl,
       subscriptionDetails,
@@ -536,7 +541,11 @@ router.get('/status', auth, async (req, res) => {
       error: paddleError
     };
     
-    console.log('Sending payment status response:', JSON.stringify(response, null, 2));
+    console.log('Sending payment status response with card details:', {
+      cardBrand: response.cardBrand,
+      cardLastFour: response.cardLastFour
+    });
+    
     return res.json(response);
   } catch (error) {
     console.error('Error checking payment status:', error);
