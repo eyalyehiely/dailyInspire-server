@@ -132,8 +132,8 @@ router.post('/webhook', async (req, res) => {
               console.log(`Transaction ${eventData.data.id} was paid`);
               try {
 
-                console.log('Sending welcome email to:', eventData.data?.items[0]?.custom_data?.user_id || eventData.data?.customer_email);
-                await sendWelcomeEmail(eventData.data?.items[0]?.custom_data?.user_id || eventData.data?.customer_email);
+                console.log('Sending welcome email to:', eventData.data?.custom_data?.user_id || eventData.data?.customer_email);
+                await sendWelcomeEmail(eventData.data?.custom_data?.user_id || eventData.data?.customer_email);
               } catch (error) {
                 console.error('Error sending welcome email:', error);
                 // Don't fail the webhook for email errors
@@ -145,7 +145,7 @@ router.post('/webhook', async (req, res) => {
               case EventName.SubscriptionCanceled:
               console.log('\n===== PROCESSING SUBSCRIPTION CANCELLED =====');
               try {
-                const customerEmail = eventData.data?.items[0]?.custom_data?.email || eventData.data?.customer_email;
+                const customerEmail = eventData.data?.custom_data?.user_id || eventData.data?.customer_email;
                 console.log('Customer Email from webhook:', customerEmail);
                 console.log('Webhook Customer Data:', JSON.stringify(eventData.data?.customer, null, 2));
                 
@@ -154,7 +154,7 @@ router.post('/webhook', async (req, res) => {
                   return res.status(400).json({ error: 'No customer email found' });
                 }
 
-                const user = await User.findOne({ email: customerEmail });
+                const user = await User.findOne({ _id: customerEmail });
                 console.log('User Found:', user ? 'Yes' : 'No');
                 console.log('User Details:', {
                   id: user?._id,
