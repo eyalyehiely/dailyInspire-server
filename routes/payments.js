@@ -121,6 +121,8 @@ router.post('/webhook', async (req, res) => {
         if (signature && rawRequestBody) {
           // The `unmarshal` function will validate the integrity of the webhook and return an entity
           const eventData = await paddle.webhooks.unmarshal(rawRequestBody, secretKey, signature);
+          console.log('Event Data:', JSON.stringify(eventData, null, 2));
+
           switch (eventData.eventType) {
             case EventName.SubscriptionActivated:
               console.log(`Subscription ${eventData.data.id} was activated`);
@@ -129,11 +131,13 @@ router.post('/webhook', async (req, res) => {
             case EventName.TransactionPaid:
               console.log(`Transaction ${eventData.data.id} was paid`);
               try {
-                console.log('Sending welcome email to:', eventData.data?.items[0]?.custom_data?.email || eventData.data?.customer_email);
-                await sendWelcomeEmail(eventData.data?.items[0]?.custom_data?.email || eventData.data?.customer_email);
+
+                console.log('Sending welcome email to:', eventData.data?.items[0]?.custom_data?.user_id || eventData.data?.customer_email);
+                await sendWelcomeEmail(eventData.data?.items[0]?.custom_data?.user_id || eventData.data?.customer_email);
               } catch (error) {
                 console.error('Error sending welcome email:', error);
                 // Don't fail the webhook for email errors
+                
               }
               break;
             case EventName.SubscriptionCanceled:

@@ -2,14 +2,14 @@ const nodemailer = require('nodemailer');
 const User = require('../models/User');
 
 // Function to send welcome email after signup
-const sendWelcomeEmail = async (userEmail) => {
+const sendWelcomeEmail = async (user_id) => {
   try {
-    console.log('Preparing to send welcome email to:', userEmail);
+    console.log('Preparing to send welcome email to:', user_id);
     
     // First, find the user by email to get all user data
-    const user = await User.findOne({ email: userEmail });
+    const user = await User.findOne({ _id: user_id });
     if (!user) {
-      console.error('User not found for email:', userEmail);
+      console.error('User not found for email:', user_id);
       return;
     }
 
