@@ -132,8 +132,8 @@ router.post('/webhook', async (req, res) => {
               console.log(`Transaction ${eventData.data.id} was paid`);
               try {
 
-                console.log('Sending welcome email to:', eventData.data?.custom_data?.user_id || eventData.data?.customer_email);
-                await sendWelcomeEmail(eventData.data?.custom_data?.user_id || eventData.data?.customer_email);
+                console.log('Sending welcome email to:', eventData.data?.customData?.user_id);
+                await sendWelcomeEmail(eventData.data?.customData?.user_id);
               } catch (error) {
                 console.error('Error sending welcome email:', error);
                 // Don't fail the webhook for email errors
@@ -145,16 +145,16 @@ router.post('/webhook', async (req, res) => {
               case EventName.SubscriptionCanceled:
               console.log('\n===== PROCESSING SUBSCRIPTION CANCELLED =====');
               try {
-                const customerEmail = eventData.data?.custom_data?.user_id || eventData.data?.customer_email;
-                console.log('Customer Email from webhook:', customerEmail);
+                const userId = eventData.data?.customData?.user_id;
+                console.log('Customer ID from webhook:', userId);
                 console.log('Webhook Customer Data:', JSON.stringify(eventData.data?.customer, null, 2));
                 
-                if (!customerEmail) {
-                  console.error('❌ No customer email found in webhook data');
-                  return res.status(400).json({ error: 'No customer email found' });
+                if (!userId) {
+                  console.error('❌ No customer ID found in webhook data');
+                  return res.status(400).json({ error: 'No customer ID found' });
                 }
 
-                const user = await User.findOne({ _id: customerEmail });
+                const user = await User.findOne({ _id: userId });
                 console.log('User Found:', user ? 'Yes' : 'No');
                 console.log('User Details:', {
                   id: user?._id,
@@ -164,7 +164,7 @@ router.post('/webhook', async (req, res) => {
                 });
                 
                 if (!user) {
-                  console.error('❌ User not found for email:', customerEmail);
+                  console.error('❌ User not found for ID:', userId);
                   return res.status(404).json({ error: 'User not found' });
                 }
 
