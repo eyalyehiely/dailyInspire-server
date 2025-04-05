@@ -126,6 +126,26 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       console.error('Missing Paddle-Signature header');
       return res.status(400).json({ error: 'Missing Paddle-Signature header' });
     }
+
+    // Extract timestamp from signature and validate it
+    const timestampMatch = signature.match(/ts=(\d+)/);
+    if (!timestampMatch) {
+      console.error('Invalid signature format - missing timestamp');
+      return res.status(400).json({ error: 'Invalid signature format' });
+    }
+
+    const timestamp = parseInt(timestampMatch[1], 10);
+    const now = Math.floor(Date.now() / 1000);
+    const tolerance = 300; // 5 minutes tolerance
+
+    if (Math.abs(now - timestamp) > tolerance) {
+      console.error('Webhook timestamp is too old or in the future:', {
+        timestamp,
+        now,
+        difference: Math.abs(now - timestamp)
+      });
+      return res.status(400).json({ error: 'Webhook timestamp is invalid' });
+    }
     
     // Log the raw request details
     console.log('Raw request details:', {
@@ -151,6 +171,9 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       console.error('PADDLE_WEBHOOK_SECRET is not set in environment variables');
       return res.status(500).json({ error: 'Webhook configuration error' });
     }
+
+    // Log the secret key (first few characters only for security)
+    console.log('Webhook secret key (first 10 chars):', secretKey.substring(0, 10) + '...');
     
     // Log verification details
     console.log('Webhook verification details:', {
@@ -158,129 +181,135 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       bodyLength: rawBody.length,
       contentType: req.headers['content-type'],
       contentLength: req.headers['content-length'],
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      rawBodyPreview: rawBody.toString('utf8').substring(0, 100) + '...'
     });
     
-    // Verify the webhook signature and get event data
-    const eventData = await paddle.webhooks.unmarshal(
-      rawBody,  // Use the copied buffer
-      secretKey,
-      signature
-    );
-    
-    console.log('✅ Webhook signature verified successfully');
-    console.log('Event type:', eventData.eventType);
-    console.log('Event data:', JSON.stringify(eventData.data, null, 2));
-    
-    // Extract user ID from custom data or find by email
-    let userId = null;
-    
-    // Try to get user ID from custom data first
-    if (eventData.data?.custom_data?.user_id) {
-      userId = eventData.data.custom_data.user_id;
-      console.log('Found user ID in custom data:', userId);
-    }
-    
-    // If no user ID in custom data, try to find by email
-    if (!userId && eventData.data?.customer_email) {
-      const user = await User.findOne({ email: eventData.data.customer_email });
-      if (user) {
-        userId = user._id;
-        console.log('Found user by email:', userId);
+    try {
+      // Verify the webhook signature and get event data
+      const eventData = await paddle.webhooks.unmarshal(
+        rawBody,  // Use the copied buffer
+        secretKey,
+        signature
+      );
+      
+      console.log('✅ Webhook signature verified successfully');
+      console.log('Event type:', eventData.eventType);
+      console.log('Event data:', JSON.stringify(eventData.data, null, 2));
+      
+      // Extract user ID from custom data or find by email
+      let userId = null;
+      
+      // Try to get user ID from custom data first
+      if (eventData.data?.custom_data?.user_id) {
+        userId = eventData.data.custom_data.user_id;
+        console.log('Found user ID in custom data:', userId);
       }
-    }
-    
-    if (!userId) {
-      console.error('Could not find user ID from webhook data');
-      return res.status(400).json({ error: 'Could not find user ID' });
-    }
-    
-    // Handle different webhook events
-    switch (eventData.eventType) {
-      case EventName.SubscriptionCreated:
-      case EventName.SubscriptionUpdated:
-      case EventName.SubscriptionPaymentSucceeded:
-      case EventName.CheckoutCompleted:
-        // When a new subscription is created or payment succeeds
-        console.log(`Processing ${eventData.eventType} for user ${userId}`);
-        
-        // Extract subscription ID from various possible locations in the webhook data
-        let subscriptionId;
-        
-        if (eventData.eventType === EventName.CheckoutCompleted) {
-          // For checkout.completed events, we need to get the subscription ID from the items array
-          subscriptionId = eventData.data?.items?.[0]?.subscription_id;
-          if (!subscriptionId) {
-            console.error('Missing subscription ID in checkout.completed webhook data');
-            return res.status(400).json({ error: 'Missing subscription ID in checkout data' });
-          }
-        } else {
-          // For other subscription events
-          subscriptionId = eventData.data?.subscription_id || 
-                         eventData.data?.id || 
-                         eventData.data?.attributes?.subscription_id ||
-                         eventData.data?.attributes?.id;
+      
+      // If no user ID in custom data, try to find by email
+      if (!userId && eventData.data?.customer_email) {
+        const user = await User.findOne({ email: eventData.data.customer_email });
+        if (user) {
+          userId = user._id;
+          console.log('Found user by email:', userId);
+        }
+      }
+      
+      if (!userId) {
+        console.error('Could not find user ID from webhook data');
+        return res.status(400).json({ error: 'Could not find user ID' });
+      }
+      
+      // Handle different webhook events
+      switch (eventData.eventType) {
+        case EventName.SubscriptionCreated:
+        case EventName.SubscriptionUpdated:
+        case EventName.SubscriptionPaymentSucceeded:
+        case EventName.CheckoutCompleted:
+          // When a new subscription is created or payment succeeds
+          console.log(`Processing ${eventData.eventType} for user ${userId}`);
           
-          if (!subscriptionId) {
-            console.error('Missing subscription ID in webhook data');
-            return res.status(400).json({ error: 'Missing subscription ID' });
+          // Extract subscription ID from various possible locations in the webhook data
+          let subscriptionId;
+          
+          if (eventData.eventType === EventName.CheckoutCompleted) {
+            // For checkout.completed events, we need to get the subscription ID from the items array
+            subscriptionId = eventData.data?.items?.[0]?.subscription_id;
+            if (!subscriptionId) {
+              console.error('Missing subscription ID in checkout.completed webhook data');
+              return res.status(400).json({ error: 'Missing subscription ID in checkout data' });
+            }
+          } else {
+            // For other subscription events
+            subscriptionId = eventData.data?.subscription_id || 
+                           eventData.data?.id || 
+                           eventData.data?.attributes?.subscription_id ||
+                           eventData.data?.attributes?.id;
+            
+            if (!subscriptionId) {
+              console.error('Missing subscription ID in webhook data');
+              return res.status(400).json({ error: 'Missing subscription ID' });
+            }
           }
-        }
-        
-        // Process the payment and update user status
-        const updatedUser = await processSuccessfulPayment(userId, subscriptionId);
-        
-        // Send welcome email for new subscriptions
-        if (eventData.eventType === EventName.SubscriptionCreated || 
-            eventData.eventType === EventName.CheckoutCompleted) {
-          await sendWelcomeEmail(updatedUser);
-        }
-        
-        // Send receipt email for successful payments
-        if (eventData.eventType === EventName.SubscriptionPaymentSucceeded || 
-            eventData.eventType === EventName.CheckoutCompleted) {
-          await sendReceiptEmail(updatedUser, { orderId: subscriptionId });
-        }
-        
-        return res.status(200).json({ 
-          success: true,
-          message: 'Payment processed successfully',
-          user: {
-            id: updatedUser._id,
-            email: updatedUser.email,
-            isPay: updatedUser.isPay,
-            subscriptionStatus: updatedUser.subscriptionStatus,
-            quotesEnabled: updatedUser.quotesEnabled
+          
+          // Process the payment and update user status
+          const updatedUser = await processSuccessfulPayment(userId, subscriptionId);
+          
+          // Send welcome email for new subscriptions
+          if (eventData.eventType === EventName.SubscriptionCreated || 
+              eventData.eventType === EventName.CheckoutCompleted) {
+            await sendWelcomeEmail(updatedUser);
           }
-        });
-        
-      case EventName.SubscriptionCanceled:
-        // When a subscription is cancelled
-        console.log(`Processing subscription cancellation for user ${userId}`);
-        await subscriptionService.cancelSubscription(eventData.data.id);
-        return res.status(200).json({ success: true, message: 'Subscription cancelled' });
-        
-      case EventName.SubscriptionPaused:
-        // When a subscription is paused
-        console.log(`Processing subscription pause for user ${userId}`);
-        await subscriptionService.pauseSubscription(eventData.data.id);
-        return res.status(200).json({ success: true, message: 'Subscription paused' });
-        
-      case EventName.SubscriptionResumed:
-        // When a subscription is resumed
-        console.log(`Processing subscription resume for user ${userId}`);
-        await subscriptionService.resumeSubscription(eventData.data.id);
-        return res.status(200).json({ success: true, message: 'Subscription resumed' });
-        
-      default:
-        console.log(`Unhandled webhook event: ${eventData.eventType}`);
-        return res.status(200).json({ received: true, status: 'unhandled_event' });
+          
+          // Send receipt email for successful payments
+          if (eventData.eventType === EventName.SubscriptionPaymentSucceeded || 
+              eventData.eventType === EventName.CheckoutCompleted) {
+            await sendReceiptEmail(updatedUser, { orderId: subscriptionId });
+          }
+          
+          return res.status(200).json({ 
+            success: true,
+            message: 'Payment processed successfully',
+            user: {
+              id: updatedUser._id,
+              email: updatedUser.email,
+              isPay: updatedUser.isPay,
+              subscriptionStatus: updatedUser.subscriptionStatus,
+              quotesEnabled: updatedUser.quotesEnabled
+            }
+          });
+          
+        case EventName.SubscriptionCanceled:
+          // When a subscription is cancelled
+          console.log(`Processing subscription cancellation for user ${userId}`);
+          await subscriptionService.cancelSubscription(eventData.data.id);
+          return res.status(200).json({ success: true, message: 'Subscription cancelled' });
+          
+        case EventName.SubscriptionPaused:
+          // When a subscription is paused
+          console.log(`Processing subscription pause for user ${userId}`);
+          await subscriptionService.pauseSubscription(eventData.data.id);
+          return res.status(200).json({ success: true, message: 'Subscription paused' });
+          
+        case EventName.SubscriptionResumed:
+          // When a subscription is resumed
+          console.log(`Processing subscription resume for user ${userId}`);
+          await subscriptionService.resumeSubscription(eventData.data.id);
+          return res.status(200).json({ success: true, message: 'Subscription resumed' });
+          
+        default:
+          console.log(`Unhandled webhook event: ${eventData.eventType}`);
+          return res.status(200).json({ received: true, status: 'unhandled_event' });
+      }
+    } catch (error) {
+      console.error('Error processing webhook:', error);
+      console.error('Webhook signature:', req.headers['paddle-signature']);
+      console.error('Raw body length:', req.body?.toString().length);
+      return res.status(401).json({ error: 'Invalid webhook signature' });
     }
   } catch (error) {
     console.error('Error processing webhook:', error);
-    console.error('Webhook signature:', req.headers['paddle-signature']);
-    console.error('Raw body length:', req.body?.toString().length);
-    return res.status(401).json({ error: 'Invalid webhook signature' });
+    return res.status(500).json({ error: error.message });
   }
 });
 
