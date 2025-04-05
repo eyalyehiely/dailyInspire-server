@@ -175,12 +175,12 @@ router.post('/webhooks', express.raw({ type: 'application/json' }), async (req, 
 
         case EventName.CheckoutCompleted:
           console.log(`Checkout ${eventData.data.id} was completed`);
-          try {
-            await sendWelcomeEmail(eventData.data.customer_email);
-          } catch (error) {
-            console.error('Error sending welcome email:', error);
-            // Don't fail the webhook for email errors
-          }
+          // try {
+          //   await sendWelcomeEmail(eventData.data.customer_email);
+          // } catch (error) {
+          //   console.error('Error sending welcome email:', error);
+          //   // Don't fail the webhook for email errors
+          // }
           break;
 
         case EventName.CheckoutUpdated:
@@ -226,6 +226,17 @@ router.post('/webhooks', express.raw({ type: 'application/json' }), async (req, 
 
         case EventName.CheckoutPaymentDisputeUpdated:
           console.log(`Checkout ${eventData.data.id} payment dispute updated`);
+          break;
+
+
+        case EventName.TransactionPaid:
+          console.log(`Transaction ${eventData.data.id} was paid`);
+          try {
+            await sendWelcomeEmail(eventData.data.customer_email);
+          } catch (error) {
+            console.error('Error sending welcome email:', error);
+            // Don't fail the webhook for email errors
+          }
           break;
 
         default:
