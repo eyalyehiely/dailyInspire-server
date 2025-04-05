@@ -212,9 +212,41 @@ const sendPaymentFailedEmail = async (user) => {
   }
 };
 
+
+const cancelSubscriptionEmail = async (user_id) => {
+  try {
+    const user = await User.findOne({ _id: user_id });
+    if (!user) {
+      console.error('User not found for ID:', user_id);
+      return;
+    }
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || `Daily Inspirational Quotes <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: 'Subscription Canceled - Daily Inspirational Quotes',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2>Subscription Canceled</h2>
+          <p>We regret to inform you that your subscription has been canceled. You will no longer receive daily inspirational quotes.</p>
+          <p>If you have any questions or need assistance, please contact our support team.</p>
+          <p>Thank you for your understanding.</p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Cancel subscription email sent to user: ${user.email}`);
+  } catch (error) {
+    console.error('Error sending cancel subscription email:', error);
+  }
+};
+
+
 // Export the functions
 module.exports = {
   sendWelcomeEmail,
   sendEmailToOwner,
-  sendPaymentFailedEmail
+  sendPaymentFailedEmail,
+  cancelSubscriptionEmail
 }; 

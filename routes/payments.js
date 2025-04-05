@@ -7,7 +7,7 @@ const {
   processSuccessfulPayment,
   paddleApi,
 } = require('../controllers/paddle-controller');
-const { sendWelcomeEmail, sendPaymentFailedEmail } = require('../controllers/user-controller');
+const { sendWelcomeEmail, sendPaymentFailedEmail, cancelSubscriptionEmail } = require('../controllers/user-controller');
 const subscriptionService = require('../services/subscriptionService');
 const mongoose = require('mongoose');
 
@@ -184,6 +184,8 @@ router.post('/webhook', async (req, res) => {
                   subscriptionStatus: updatedUser.subscriptionStatus,
                   email: updatedUser.email
                 });
+
+                await cancelSubscriptionEmail(userId);
 
                 return res.status(200).json({ 
                   success: true, 
