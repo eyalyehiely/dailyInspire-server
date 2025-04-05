@@ -134,9 +134,9 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     }
     
     // Get the webhook secret key
-    const secretKey = process.env['WEBHOOK_SECRET_KEY'];
+    const secretKey = process.env['PADDLE_WEBHOOK_SECRET'];
     if (!secretKey) {
-      console.error('WEBHOOK_SECRET_KEY is not set in environment variables');
+      console.error('PADDLE_WEBHOOK_SECRET is not set in environment variables');
       return res.status(500).json({ error: 'Webhook configuration error' });
     }
     
