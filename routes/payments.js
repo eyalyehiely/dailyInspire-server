@@ -121,6 +121,7 @@ router.post('/webhooks', express.raw({ type: 'application/json' }), async (req, 
     
     const rawRequestBody = req.body.toString();
     console.log('Request Body Length:', rawRequestBody.length);
+    console.log('Request Body Preview:', rawRequestBody.substring(0, 500) + '...');
     
     const secretKey = process.env['PADDLE_WEBHOOK_SECRET'] || '';
     console.log('Webhook Secret:', secretKey ? 'Present' : 'Missing');
@@ -135,14 +136,15 @@ router.post('/webhooks', express.raw({ type: 'application/json' }), async (req, 
       const eventData = await paddle.webhooks.unmarshal(rawRequestBody, secretKey, signature);
       console.log('✅ Webhook signature verified successfully');
       console.log('Event Type:', eventData.eventType);
-      console.log('Event Data:', JSON.stringify(eventData.data, null, 2));
+      console.log('Full Event Data:', JSON.stringify(eventData, null, 2));
       
       switch (eventData.eventType) {
         case EventName.CheckoutCompleted:
           console.log('\n===== PROCESSING CHECKOUT COMPLETED =====');
           try {
             const customerEmail = eventData.data?.customer?.email || eventData.data?.customer_email;
-            console.log('Customer Email:', customerEmail);
+            console.log('Customer Email from webhook:', customerEmail);
+            console.log('Webhook Customer Data:', JSON.stringify(eventData.data?.customer, null, 2));
             
             if (!customerEmail) {
               console.error('❌ No customer email found in webhook data');
@@ -151,6 +153,12 @@ router.post('/webhooks', express.raw({ type: 'application/json' }), async (req, 
 
             const user = await User.findOne({ email: customerEmail });
             console.log('User Found:', user ? 'Yes' : 'No');
+            console.log('User Details:', {
+              id: user?._id,
+              email: user?.email,
+              isPay: user?.isPay,
+              subscriptionStatus: user?.subscriptionStatus
+            });
             
             if (!user) {
               console.error('❌ User not found for email:', customerEmail);
@@ -166,11 +174,33 @@ router.post('/webhooks', express.raw({ type: 'application/json' }), async (req, 
             };
             console.log('Updating user with data:', updateData);
 
-            await User.findByIdAndUpdate(user._id, updateData);
+            const updatedUser = await User.findByIdAndUpdate(user._id, updateData, { new: true });
             console.log('✅ User updated successfully');
+            console.log('Updated User Status:', {
+              isPay: updatedUser.isPay,
+              subscriptionStatus: updatedUser.subscriptionStatus,
+              email: updatedUser.email
+            });
 
-            await sendWelcomeEmail(user);
-            console.log('✅ Welcome email sent');
+            console.log('\n===== ATTEMPTING TO SEND WELCOME EMAIL =====');
+            console.log('Email Configuration:', {
+              from: process.env.EMAIL_FROM,
+              to: updatedUser.email,
+              subject: 'Welcome to DailyInspire'
+            });
+
+            try {
+              await sendWelcomeEmail(updatedUser);
+              console.log('✅ Welcome email sent successfully to:', updatedUser.email);
+            } catch (emailError) {
+              console.error('❌ Error sending welcome email:', emailError);
+              console.error('Email Error Stack:', emailError.stack);
+              console.error('Email Configuration:', {
+                from: process.env.EMAIL_FROM,
+                to: updatedUser.email,
+                subject: 'Welcome to DailyInspire'
+              });
+            }
           } catch (error) {
             console.error('❌ Error processing checkout completed:', error);
             console.error('Error stack:', error.stack);
@@ -209,12 +239,25 @@ router.post('/webhooks', express.raw({ type: 'application/json' }), async (req, 
             };
             console.log('Updating user with data:', updateData);
 
-            await User.findByIdAndUpdate(user._id, updateData);
+            const updatedUser = await User.findByIdAndUpdate(user._id, updateData, { new: true });
             console.log('✅ User updated successfully');
+            console.log('Updated User Status:', {
+              isPay: updatedUser.isPay,
+              subscriptionStatus: updatedUser.subscriptionStatus
+            });
 
             if (!user.isPay) {
-              await sendWelcomeEmail(user);
-              console.log('✅ Welcome email sent (first payment)');
+              console.log('First payment detected, sending welcome email...');
+              try {
+                await sendWelcomeEmail(updatedUser);
+                console.log('✅ Welcome email sent successfully');
+              } catch (emailError) {
+                console.error('❌ Error sending welcome email:', emailError);
+                console.error('Email Error Stack:', emailError.stack);
+                // Don't fail the webhook for email errors
+              }
+            } else {
+              console.log('Not first payment, skipping welcome email');
             }
           } catch (error) {
             console.error('❌ Error processing subscription payment succeeded:', error);
