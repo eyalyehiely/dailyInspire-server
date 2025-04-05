@@ -190,6 +190,19 @@ router.post('/webhooks', verifyPaddleIP, express.raw({ type: 'application/json' 
       return res.status(500).json({ error: 'Server configuration error' });
     }
 
+    // Log verification details
+    console.log('Webhook Verification Details:', {
+      signature,
+      secretKey: secretKey ? 'Present' : 'Missing',
+      bodyLength: rawRequestBody.length,
+      bodyPreview: rawRequestBody.substring(0, 100) + '...',
+      headers: {
+        'paddle-signature': signature,
+        'content-type': req.headers['content-type'],
+        'paddle-version': req.headers['paddle-version']
+      }
+    });
+
     try {
       // Verify the webhook signature using Paddle's SDK
       const eventData = await paddle.webhooks.unmarshal(rawRequestBody, secretKey, signature);
