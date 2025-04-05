@@ -313,7 +313,7 @@ router.get('/checkout-info', auth, async (req, res) => {
 
 // Create a `POST` endpoint to accept webhooks sent by Paddle.
 // We need `raw` request body to validate the integrity. Use express raw middleware to ensure express doesn't convert the request body to JSON.
-app.post('/webhooks', express.raw({ type: 'application/json' }), async (req, res) => {
+router.post('/webhooks', express.raw({ type: 'application/json' }), async (req, res) => {
   const signature = (req.headers['paddle-signature']) || '';
   // req.body should be of type `buffer`, convert to string before passing it to `unmarshal`. 
   // If express returned a JSON, remove any other middleware that might have processed raw request to object
