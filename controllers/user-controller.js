@@ -163,8 +163,46 @@ const sendEmailToOwner = async (user) => {
   }
 };
 
+// Send sorry email to user that cancel his subscription
+const sendPaymentFailedEmail = async (user) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: process.env.EMAIL_SERVICE || 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_FROM || `Daily Inspirational Quotes <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: 'Sorry, we couldn\'t process your payment',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h2>Sorry, we couldn't process your payment</h2>
+          <p>We're sorry to inform you that we couldn't process your payment. Please try again using a different payment method.</p>
+          <p>If you continue to experience issues, please contact our support team for assistance.</p>
+          <p>Thank you for your understanding.</p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Sorry email sent to user: ${user.email}`);
+  } catch (error) {
+    console.error('Error sending sorry email:', error);
+    // Don't throw - we don't want to break the signup process if email fails
+  }
+};
+
+
+
+
+
 // Export the functions
 module.exports = {
   sendWelcomeEmail,
-  sendEmailToOwner
+  sendEmailToOwner,
+  sendPaymentFailedEmail
 }; 
