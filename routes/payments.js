@@ -202,6 +202,16 @@ router.post('/webhook', async (req, res) => {
                 return res.status(500).json({ error: 'Failed to process subscription cancellation' });
               }
               break;
+              case EventName.TransactionPaymentFailed:
+                console.log(`Transaction ${eventData.data.id} payment failed`);
+                try {
+                  const userId = eventData.data?.customData?.user_id;
+                  await sendPaymentFailedEmail(userId);
+                } catch (error) {
+                  console.error('❌ Error processing transaction payment failure:', error);
+                  console.error('Error stack:', error.stack);
+                  return res.status(500).json({ error: 'Failed to process transaction payment failure' });
+                }
 
 
               break;
