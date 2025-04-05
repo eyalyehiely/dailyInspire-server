@@ -146,7 +146,39 @@ router.post('/webhooks', express.raw({ type: 'application/json' }), async (req, 
           break;
 
         case EventName.SubscriptionPaymentSucceeded:
-          console.log(`Subscription ${eventData.data.id} payment succeeded`);
+          console.log(`Subscription payment succeeded for ${eventData.data.id}`);
+          try {
+            // Get customer email from the correct path in the webhook data
+            const customerEmail = eventData.data?.customer?.email || eventData.data?.customer_email;
+            if (!customerEmail) {
+              console.error('No customer email found in webhook data');
+              return res.status(400).json({ error: 'No customer email found' });
+            }
+
+            // Find user by email
+            const user = await User.findOne({ email: customerEmail });
+            if (!user) {
+              console.error('User not found for email:', customerEmail);
+              return res.status(404).json({ error: 'User not found' });
+            }
+
+            // Update user's subscription status
+            await User.findByIdAndUpdate(user._id, {
+              subscriptionStatus: 'active',
+              isPay: true,
+              quotesEnabled: true,
+              paymentUpdatedAt: new Date(),
+              subscriptionId: eventData.data?.subscription_id || eventData.data?.id
+            });
+
+            // Send welcome email if this is the first payment
+            if (!user.isPay) {
+              await sendWelcomeEmail(user);
+            }
+          } catch (error) {
+            console.error('Error processing subscription payment succeeded:', error);
+            // Don't fail the webhook for email errors
+          }
           break;
 
         case EventName.SubscriptionCanceled:
@@ -175,12 +207,36 @@ router.post('/webhooks', express.raw({ type: 'application/json' }), async (req, 
 
         case EventName.CheckoutCompleted:
           console.log(`Checkout ${eventData.data.id} was completed`);
-          // try {
-          //   await sendWelcomeEmail(eventData.data.customer_email);
-          // } catch (error) {
-          //   console.error('Error sending welcome email:', error);
-          //   // Don't fail the webhook for email errors
-          // }
+          try {
+            // Get customer email from the correct path in the webhook data
+            const customerEmail = eventData.data?.customer?.email || eventData.data?.customer_email;
+            if (!customerEmail) {
+              console.error('No customer email found in webhook data');
+              return res.status(400).json({ error: 'No customer email found' });
+            }
+
+            // Find user by email
+            const user = await User.findOne({ email: customerEmail });
+            if (!user) {
+              console.error('User not found for email:', customerEmail);
+              return res.status(404).json({ error: 'User not found' });
+            }
+
+            // Update user's subscription status
+            await User.findByIdAndUpdate(user._id, {
+              subscriptionStatus: 'active',
+              isPay: true,
+              quotesEnabled: true,
+              paymentUpdatedAt: new Date(),
+              subscriptionId: eventData.data?.subscription_id || eventData.data?.id
+            });
+
+            // Send welcome email
+            await sendWelcomeEmail(user);
+          } catch (error) {
+            console.error('Error processing checkout completed:', error);
+            // Don't fail the webhook for email errors
+          }
           break;
 
         case EventName.CheckoutUpdated:
@@ -227,7 +283,6 @@ router.post('/webhooks', express.raw({ type: 'application/json' }), async (req, 
         case EventName.CheckoutPaymentDisputeUpdated:
           console.log(`Checkout ${eventData.data.id} payment dispute updated`);
           break;
-
 
         case EventName.TransactionPaid:
           console.log(`Transaction ${eventData.data.id} was paid`);
