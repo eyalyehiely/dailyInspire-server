@@ -119,14 +119,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     console.log('===== WEBHOOK RECEIVED =====');
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
     
-    // Get the raw body string
-    const rawBody = req.body.toString();
+    // Get the raw body buffer
+    const rawBody = req.body;
     if (!rawBody) {
       console.error('Raw body not available');
       return res.status(400).json({ error: 'Raw body not available' });
     }
     
-    // Verify webhook signature from Paddle
+    // Get the signature from the header
     const signature = req.headers['paddle-signature'];
     if (!signature) {
       console.error('Missing webhook signature');
