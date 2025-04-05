@@ -3,7 +3,7 @@ const router = express.Router();
 const { sendQuotesToAllUsers } = require('../controllers/quote-sender');
 const User = require('../models/User')
 const jwt = require('jsonwebtoken');
-const { sendWelcomeEmail, sendEmailToOwner } = require('../controllers/user-controller');
+const {sendEmailToOwner } = require('../controllers/user-controller');
 // Add timezone validation utility
 const isValidTimezone = (timezone) => {
   try {

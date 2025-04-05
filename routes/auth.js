@@ -186,7 +186,9 @@ router.get('/preferences', auth, async (req, res) => {
         last_name: user.last_name,
         preferredTime: user.preferredTime,
         timezone: user.timezone,
-        quotesEnabled: user.quotesEnabled
+        quotesEnabled: user.quotesEnabled,
+        cardBrand: user.cardBrand,
+        cardLastFour: user.cardLastFour
       }
     });
   } catch (error) {
@@ -310,6 +312,53 @@ router.get('/verify', auth, async (req, res) => {
   } catch (error) {
     console.error('Error verifying token:', error);
     return res.status(500).json({ isValid: false, message: 'Server error' });
+  }
+});
+
+// Add this route to create a new user
+router.post('/signup', async (req, res) => {
+  try {
+    const { email, password, first_name, last_name } = req.body;
+    
+    // Check if all fields are provided
+    if (!email || !password || !first_name || !last_name) {
+      return res.status(400).json({ 
+        message: 'Please provide all required fields',
+        fields: {
+          email: email ? 'provided' : 'missing',
+          password: password ? 'provided' : 'missing',
+          first_name: first_name ? 'provided' : 'missing',
+          last_name: last_name ? 'provided' : 'missing'
+        }
+      });
+    }
+    
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ message: 'User already exists' });
+    }
+    
+    // Create new user
+    const user = new User({
+      email,
+      password,
+      first_name,
+      last_name,
+      lastCheckoutAttempt: {
+        url: null,
+        firstPaymentDate: null,
+        nextPaymentDate: null,
+        timestamp: null
+      }
+    });
+    
+    await user.save();
+    
+    res.status(201).json({ message: 'User created successfully' });
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ message: 'Server error while creating user' });
   }
 });
 

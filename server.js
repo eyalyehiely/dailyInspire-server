@@ -13,7 +13,8 @@ const auth = require('./middleware/auth');
 const completeRegistration = require('./middleware/completeRegistration');
 const passwordResetRoutes = require('./routes/password-reset');
 const contactRoutes = require('./routes/contact');
-
+const testingRoutes = require('./routes/testing');
+const rawBody = require('./middleware/raw-body');
 // Import and start the scheduler
 const { startScheduler } = require('./controllers/scheduler');
 
@@ -24,14 +25,15 @@ app.use(cors({
   credentials: true
 }));
 
-// Add webhook logger middleware BEFORE JSON parsing
-// This is crucial for capturing the raw body for webhook signature verification
+// Add raw body middleware for webhook verification
+app.use('/api/payments/webhook', rawBody);
+
+// Parse JSON and URL-encoded bodies for all other routes
+app.use(express.json());
+
+// Add webhook logger middleware AFTER body parsing
 const webhookLogger = require('./middleware/webhook-logger');
 app.use(webhookLogger);
-
-// Only parse JSON after webhook logger has captured raw body
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 // Call this before setting up routes
 connectDB();
@@ -53,7 +55,7 @@ app.use('/api/quotes', quoteRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api', passwordResetRoutes);
 app.use('/api/contact', contactRoutes);
-
+app.use('/api/testing', testingRoutes);
 // Protected route example - requires both authentication and complete registration
 app.get('/api/profile', auth, completeRegistration, (req, res) => {
   res.json({ user: req.user });

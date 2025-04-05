@@ -23,6 +23,20 @@ const getSubscription = async (paddleId) => {
     console.log(`Using subscription ID: ${paddleId}`);
     
     const response = await paddleApi.get(`/subscriptions/${paddleId}`);
+    
+    // Log payment information specifically
+    if (response.data && response.data.data) {
+      console.log('Paddle subscription response structure:', Object.keys(response.data.data));
+      
+      if (response.data.data.payment_information) {
+        console.log('Payment information keys:', Object.keys(response.data.data.payment_information));
+        console.log('Card brand:', response.data.data.payment_information.card_brand);
+        console.log('Last four:', response.data.data.payment_information.last_four);
+      } else {
+        console.log('No payment_information found in Paddle response');
+      }
+    }
+    
     return response.data;
   } catch (error) {
     console.error(`Error fetching subscription ${paddleId}:`, error.message);
@@ -51,6 +65,17 @@ const syncSubscription = async (paddleSubscription, userId) => {
       status: paddleSubscription.status,
       paymentInfo: paddleSubscription.payment_information
     });
+    
+    // Log specific payment fields 
+    if (paddleSubscription.payment_information) {
+      console.log('Payment information details:');
+      console.log('- Card brand:', paddleSubscription.payment_information.card_brand);
+      console.log('- Last four:', paddleSubscription.payment_information.last_four);
+      console.log('- Expiry month:', paddleSubscription.payment_information.expiry_month);
+      console.log('- Expiry year:', paddleSubscription.payment_information.expiry_year);
+    } else {
+      console.log('No payment information available in subscription data');
+    }
     
     const subscriptionData = {
       paddleSubscriptionId: paddleSubscription.id,
@@ -110,11 +135,35 @@ const syncSubscription = async (paddleSubscription, userId) => {
     }
     
     // Update user's subscription status
-    await User.findByIdAndUpdate(userId, {
+    const userUpdateData = {
       subscriptionId: paddleSubscription.id,
       subscriptionStatus: paddleSubscription.status,
       isPay: ['active', 'trialing'].includes(paddleSubscription.status),
-      paymentUpdatedAt: new Date()
+      paymentUpdatedAt: new Date(),
+      ...(paddleSubscription.payment_information?.card_brand && {
+        cardBrand: paddleSubscription.payment_information.card_brand
+      }),
+      ...(paddleSubscription.payment_information?.last_four && {
+        cardLastFour: paddleSubscription.payment_information.last_four
+      })
+    };
+    
+    console.log('Updating user with card details:', {
+      userId,
+      subscriptionId: paddleSubscription.id,
+      cardBrand: userUpdateData.cardBrand,
+      cardLastFour: userUpdateData.cardLastFour
+    });
+    
+    await User.findByIdAndUpdate(userId, userUpdateData);
+    
+    // Verify the user was updated properly
+    const updatedUser = await User.findById(userId);
+    console.log('User after update:', {
+      userId: updatedUser._id,
+      cardBrand: updatedUser.cardBrand,
+      cardLastFour: updatedUser.cardLastFour,
+      subscriptionStatus: updatedUser.subscriptionStatus
     });
     
     return subscription;
@@ -251,6 +300,51 @@ const getActiveSubscription = async (userId) => {
   }
 };
 
+/**
+ * Update next payment date for active subscriptions
+ * @returns {Promise<void>}
+ */
+const updateNextPaymentDates = async () => {
+  try {
+    console.log('Starting next payment date update process...');
+    
+    // Get current date in Israel timezone
+    const now = new Date();
+    const israelTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+    
+    // Find all users with active subscriptions
+    const users = await User.find({
+      subscriptionStatus: 'active',
+      'lastCheckoutAttempt.nextPaymentDate': { $lt: israelTime }
+    });
+    
+    console.log(`Found ${users.length} users to update next payment date`);
+    
+    for (const user of users) {
+      try {
+        // Calculate new next payment date (same date next month)
+        const newNextPaymentDate = new Date(user.lastCheckoutAttempt.nextPaymentDate);
+        newNextPaymentDate.setMonth(newNextPaymentDate.getMonth() + 1);
+        
+        // Update user's next payment date
+        await User.findByIdAndUpdate(user._id, {
+          'lastCheckoutAttempt.nextPaymentDate': newNextPaymentDate,
+          'lastCheckoutAttempt.timestamp': new Date()
+        });
+        
+        console.log(`Updated next payment date for user ${user.email} to ${newNextPaymentDate}`);
+      } catch (error) {
+        console.error(`Error updating next payment date for user ${user.email}:`, error);
+      }
+    }
+    
+    console.log('Next payment date update process completed');
+  } catch (error) {
+    console.error('Error in updateNextPaymentDates:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   getSubscription,
   syncSubscription,
@@ -259,5 +353,6 @@ module.exports = {
   resumeSubscription,
   getUpdatePaymentMethodUrl,
   getUserSubscriptions,
-  getActiveSubscription
+  getActiveSubscription,
+  updateNextPaymentDates
 }; 

@@ -2,18 +2,17 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
+const { Paddle, EventName } = require('@paddle/paddle-node-sdk');
 const { 
-  verifyWebhookSignature, 
-  sendReceiptEmail, 
   processSuccessfulPayment,
-  generateCheckoutUrl,
-  verifySubscriptionStatus,
   paddleApi,
-  generateClientToken
 } = require('../controllers/paddle-controller');
-const { sendWelcomeEmail } = require('../controllers/user-controller');
+const { sendWelcomeEmail, sendPaymentFailedEmail, cancelSubscriptionEmail } = require('../controllers/user-controller');
 const subscriptionService = require('../services/subscriptionService');
 const mongoose = require('mongoose');
+
+// Initialize Paddle SDK
+const paddle = new Paddle(process.env.PADDLE_API_KEY);
 
 // Route to get payment page information
 router.get('/checkout-info', auth, async (req, res) => {
@@ -46,8 +45,8 @@ router.get('/checkout-info', auth, async (req, res) => {
       
       // Get additional subscription details from Paddle if available
       let subscriptionDetails = null;
-      // let cardBrand = "";
-      let cardLastFour = "";
+      let cardBrand = user.cardBrand;
+      let cardLastFour = user.cardLastFour;
       let customerPortalUrl = "";
       let cancelSubscriptionUrl = "";
       
@@ -98,6 +97,7 @@ router.get('/checkout-info', auth, async (req, res) => {
     };
     
     console.log("Sending checkout info to client:", responseData);
+    console.log('Final response being sent:', JSON.stringify(responseData, null, 2));
     return res.json(responseData);
   } catch (error) {
     console.error('Error in checkout-info route:', error);
@@ -109,288 +109,137 @@ router.get('/checkout-info', auth, async (req, res) => {
   }
 });
 
-// Webhook endpoint for Paddle to handle all subscription events
+// Create a `POST` endpoint to accept webhooks sent by Paddle.
 router.post('/webhook', async (req, res) => {
-  try {
-    console.log('===== WEBHOOK RECEIVED =====');
-    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('\n===== NEW WEBHOOK RECEIVED =====');
     
-    // Verify webhook signature from Paddle
-    const signature = req.headers['x-paddle-signature'];
-    if (!signature) {
-      console.error('Missing webhook signature');
-      return res.status(401).json({ error: 'Missing signature' });
-    }
-    
-    // Get the raw body string - this should be available from body-parser raw
-    const rawBody = req.rawBody;
-    if (!rawBody) {
-      console.error('Raw body not available - body-parser raw middleware may not be configured');
-      return res.status(400).json({ error: 'Raw body not available' });
-    }
-    
-    // Verify the signature with the raw body
-    const isSignatureValid = verifyWebhookSignature(signature, rawBody);
-    
-    if (!isSignatureValid) {
-      console.error('Invalid webhook signature');
-      return res.status(401).json({ error: 'Invalid signature' });
-    }
-    
-    // Parse the body
-    let body;
-    try {
-      body = JSON.parse(rawBody);
-    } catch (error) {
-      console.error('Failed to parse webhook body:', error);
-      return res.status(400).json({ error: 'Invalid JSON body' });
-    }
-    
-    const eventType = body.event_type;
-    if (!eventType) {
-      console.error('Missing event_type in webhook body');
-      return res.status(400).json({ error: 'Missing event_type' });
-    }
-    
-    // Log the incoming webhook for debugging
-    console.log(`Received Paddle webhook: ${eventType}`);
-    console.log('Webhook data:', JSON.stringify(body, null, 2));
-    
-    // Add detailed customer data logging
-    if (body.data?.customer) {
-      console.log('===== CUSTOMER DATA RECEIVED =====');
-      console.log('Customer ID:', body.data.customer.id);
-      console.log('Customer Email:', body.data.customer.email);
-      console.log('Customer Status:', body.data.customer.status);
-      console.log('Customer Name:', body.data.customer.name);
-      console.log('Customer Created At:', body.data.customer.created_at);
-      console.log('Customer Updated At:', body.data.customer.updated_at);
-      console.log('Marketing Consent:', body.data.customer.marketing_consent);
-      console.log('Locale:', body.data.customer.locale);
-      console.log('Custom Data:', body.data.customer.custom_data);
-      console.log('================================');
-    }
-    
-    // Extract user ID from custom data or find by email
-    let userId = null;
-    
-    // Try to get user ID from custom data first
-    if (body.data?.custom_data?.user_id) {
-      userId = body.data.custom_data.user_id;
-      console.log('Found user ID in custom data:', userId);
-    }
-    
-    // If no user ID in custom data, try to find by email
-    if (!userId && body.data?.customer_email) {
-      const user = await User.findOne({ email: body.data.customer_email });
-      if (user) {
-        userId = user._id;
-        console.log('Found user by email:', userId);
+    const signature = req.headers['paddle-signature'];
+    const rawRequestBody = req.body;
+    const secretKey = process.env.PADDLE_WEBHOOK_SECRET;
+
+      try {
+        if (signature && rawRequestBody) {
+          // The `unmarshal` function will validate the integrity of the webhook and return an entity
+          const eventData = await paddle.webhooks.unmarshal(rawRequestBody, secretKey, signature);
+          console.log('Event Data:', JSON.stringify(eventData, null, 2));
+
+          switch (eventData.eventType) {
+            // Activate subscription
+            case EventName.SubscriptionActivated:
+              console.log(`Subscription ${eventData.data.id} was activated`);
+              break;
+
+            case EventName.TransactionPaid:
+              console.log(`Transaction ${eventData.data.id} was paid`);
+              try {
+
+                console.log('Sending welcome email to:', eventData.data?.customData?.user_id);
+                await sendWelcomeEmail(eventData.data?.customData?.user_id);
+              } catch (error) {
+                console.error('Error sending welcome email:', error);
+                // Don't fail the webhook for email errors
+                
+              }
+              break;
+
+      // Cancel subscription
+            case EventName.SubscriptionCanceled:
+              console.log(`Subscription ${eventData.data.id} was cancelled`);
+              console.log('\n===== PROCESSING SUBSCRIPTION CANCELLED =====');
+              try {
+                const userId = eventData.data?.customData?.user_id;
+                console.log('Customer ID from webhook:', userId);
+                console.log('Webhook Customer Data:', JSON.stringify(eventData.data?.customer, null, 2));
+                
+                if (!userId) {
+                  console.error('❌ No customer ID found in webhook data');
+                  return res.status(400).json({ error: 'No customer ID found' });
+                }
+
+                const user = await User.findOne({ _id: userId });
+                console.log('User Found:', user ? 'Yes' : 'No');
+                console.log('User Details:', {
+                  id: user?._id,
+                  email: user?.email,
+                  isPay: user?.isPay,
+                  subscriptionStatus: user?.subscriptionStatus
+                });
+                
+                if (!user) {
+                  console.error('❌ User not found for ID:', userId);
+                  return res.status(404).json({ error: 'User not found' });
+                }
+
+                const updateData = {
+                  subscriptionStatus: 'canceled',
+                  isPay: false,
+                  quotesEnabled: false,
+                  paymentUpdatedAt: new Date(),
+                  canceledAt: new Date()
+                };
+                console.log('Updating user with data:', updateData);
+
+                const updatedUser = await User.findByIdAndUpdate(user._id, updateData, { new: true });
+                console.log('✅ User updated successfully');
+                console.log('Updated User Status:', {
+                  isPay: updatedUser.isPay,
+                  subscriptionStatus: updatedUser.subscriptionStatus,
+                  email: updatedUser.email
+                });
+
+                await cancelSubscriptionEmail(userId);
+
+                return res.status(200).json({ 
+                  success: true, 
+                  message: 'Subscription cancelled successfully',
+                  user: {
+                    id: updatedUser._id,
+                    email: updatedUser.email,
+                    subscriptionStatus: updatedUser.subscriptionStatus
+                  }
+                });
+              } catch (error) {
+                console.error('❌ Error processing subscription cancellation:', error);
+                console.error('Error stack:', error.stack);
+                return res.status(500).json({ error: 'Failed to process subscription cancellation' });
+              }
+            case EventName.TransactionPaymentFailed:
+              console.log(`Transaction ${eventData.data.id} payment failed`);
+              try {
+                const userId = eventData.data?.customData?.user_id;
+                await sendPaymentFailedEmail(userId);
+              } catch (error) {
+                console.error('❌ Error processing transaction payment failure:', error);
+                console.error('Error stack:', error.stack);
+                return res.status(500).json({ error: 'Failed to process transaction payment failure' });
+              }
+              break;
+            case EventName.SubscriptionPaymentMethodUpdated:
+              console.log(`Subscription ${eventData.data.id} payment method updated`);
+              try {
+                const userId = eventData.data?.customData?.user_id;
+                const user = await User.findById(userId);
+                user.cardBrand = eventData.data?.payment_information?.card_brand;
+                user.cardLastFour = eventData.data?.payment_information?.last_four;
+                await user.save();
+                console.log('✅ User card details updated successfully');
+              } catch (error) {
+                console.error('❌ Error processing payment method update:', error);
+                console.error('Error stack:', error.stack);
+              }
+              break;
+            default:
+              console.log(`Unknown event type: ${eventData.eventType}`);
+          }
+        } else {
+          console.log('❌ No signature or body found in webhook request');
+          
+        }
+      } catch (error) {
+        console.error('❌ Error in webhook route:', error);
+        return res.status(500).json({ error: 'Internal server error' });
       }
-    }
-    
-    if (!userId) {
-      console.error('Could not find user ID from webhook data');
-      return res.status(400).json({ error: 'Could not find user ID' });
-    }
-    
-    // Handle different webhook events
-    switch (eventType) {
-      case 'subscription.created':
-      case 'subscription.updated':
-      case 'subscription.payment_succeeded':
-      case 'checkout.completed':
-        // When a new subscription is created or payment succeeds
-        console.log(`Processing ${eventType} for user ${userId}`);
-        
-        // Extract subscription ID from various possible locations in the webhook data
-        let subscriptionId;
-        
-        if (eventType === 'checkout.completed') {
-          // For checkout.completed events, we need to get the subscription ID from the items array
-          subscriptionId = body.data?.items?.[0]?.subscription_id;
-          if (!subscriptionId) {
-            console.error('Missing subscription ID in checkout.completed webhook data');
-            console.log('Webhook data structure:', JSON.stringify(body, null, 2));
-            return res.status(400).json({ error: 'Missing subscription ID in checkout data' });
-          }
-        } else {
-          // For other subscription events
-          subscriptionId = body.data?.subscription_id || 
-                         body.data?.id || 
-                         body.data?.attributes?.subscription_id ||
-                         body.data?.attributes?.id;
-          
-          if (!subscriptionId) {
-            console.error('Missing subscription ID in webhook data');
-            console.log('Webhook data structure:', JSON.stringify(body, null, 2));
-            return res.status(400).json({ error: 'Missing subscription ID' });
-          }
-        }
-        
-        // Use the subscription ID as is, without adding any prefix
-        console.log(`Using subscription ID: ${subscriptionId}`);
-        
-        // Validate subscription ID format
-        if (typeof subscriptionId !== 'string' || subscriptionId.trim().length === 0) {
-          console.error('Invalid subscription ID format:', subscriptionId);
-          return res.status(400).json({ error: 'Invalid subscription ID format' });
-        }
-        
-        console.log('Processing payment with subscription ID:', subscriptionId);
-        
-        try {
-          // Get subscription data from Paddle
-          const paddleSubscription = await subscriptionService.getSubscription(subscriptionId);
-          console.log('Subscription data from Paddle:', paddleSubscription);
-          
-          // Sync subscription data to our database
-          const subscription = await subscriptionService.syncSubscription(paddleSubscription, userId);
-          console.log('Synced subscription:', subscription);
-          
-          // Send welcome email if this is a new subscription
-          if (eventType === 'subscription.created') {
-            const user = await User.findById(userId);
-            if (user) {
-              await sendWelcomeEmail(user);
-            }
-          }
-          
-          // Send receipt email
-          const user = await User.findById(userId);
-          if (user) {
-            await sendReceiptEmail(user, {
-              orderId: subscriptionId
-            });
-          }
-          
-          console.log(`Successfully processed payment for user: ${user?.email}`);
-          return res.status(200).json({ 
-            success: true,
-            message: 'Payment processed successfully',
-            user: {
-              id: user?._id,
-              email: user?.email,
-              isPay: user?.isPay,
-              subscriptionStatus: user?.subscriptionStatus,
-              quotesEnabled: user?.quotesEnabled
-            }
-          });
-        } catch (error) {
-          console.error('Error processing payment:', error);
-          console.error('Error stack:', error.stack);
-          return res.status(500).json({ 
-            error: error.message,
-            details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-          });
-        }
-        
-      case 'subscription.cancelled':
-        // When a subscription is cancelled
-        console.log(`Processing subscription cancellation for user ${userId}`);
-        
-        const canceledSubscriptionId = body.data?.subscription_id || 
-                                      body.data?.id || 
-                                      body.data?.attributes?.subscription_id ||
-                                      body.data?.attributes?.id;
-        
-        if (canceledSubscriptionId) {
-          try {
-            // Cancel subscription in Paddle and sync to our database
-            await subscriptionService.cancelSubscription(canceledSubscriptionId);
-            console.log(`Subscription cancelled for user ${userId}`);
-          } catch (error) {
-            console.error('Error canceling subscription:', error);
-          }
-        } else {
-          // Fallback to updating user directly if we can't find the subscription ID
-          await User.findByIdAndUpdate(userId, { 
-            subscriptionStatus: 'cancelled',
-            quotesEnabled: false,
-            isPay: false
-          });
-          console.log(`Subscription cancelled for user ${userId} (fallback method)`);
-        }
-        break;
-        
-      case 'subscription.paused':
-        // When a subscription is paused
-        console.log(`Processing subscription pause for user ${userId}`);
-        
-        const pausedSubscriptionId = body.data?.subscription_id || 
-                                    body.data?.id || 
-                                    body.data?.attributes?.subscription_id ||
-                                    body.data?.attributes?.id;
-        
-        if (pausedSubscriptionId) {
-          try {
-            // Pause subscription in Paddle and sync to our database
-            await subscriptionService.pauseSubscription(pausedSubscriptionId);
-            console.log(`Subscription paused for user ${userId}`);
-          } catch (error) {
-            console.error('Error pausing subscription:', error);
-          }
-        } else {
-          // Fallback to updating user directly if we can't find the subscription ID
-          await User.findByIdAndUpdate(userId, { 
-            subscriptionStatus: 'paused',
-            quotesEnabled: false,
-            isPay: false
-          });
-          console.log(`Subscription paused for user ${userId} (fallback method)`);
-        }
-        break;
-        
-      case 'subscription.resumed':
-        // When a subscription is resumed
-        console.log(`Processing subscription resume for user ${userId}`);
-        
-        const resumedSubscriptionId = body.data?.subscription_id || 
-                                     body.data?.id || 
-                                     body.data?.attributes?.subscription_id ||
-                                     body.data?.attributes?.id;
-        
-        if (resumedSubscriptionId) {
-          try {
-            // Resume subscription in Paddle and sync to our database
-            await subscriptionService.resumeSubscription(resumedSubscriptionId);
-            console.log(`Subscription resumed for user ${userId}`);
-          } catch (error) {
-            console.error('Error resuming subscription:', error);
-          }
-        } else {
-          // Fallback to updating user directly if we can't find the subscription ID
-          await User.findByIdAndUpdate(userId, { 
-            subscriptionStatus: 'active',
-            quotesEnabled: true,
-            isPay: true
-          });
-          console.log(`Subscription resumed for user ${userId} (fallback method)`);
-        }
-        break;
-        
-      default:
-        console.log(`Unhandled webhook event: ${eventType}`);
-    }
-    
-    // Verify the update was successful
-    const finalUser = await User.findById(userId);
-    console.log('Final user status:', {
-      email: finalUser.email,
-      isPay: finalUser.isPay,
-      subscriptionStatus: finalUser.subscriptionStatus,
-      quotesEnabled: finalUser.quotesEnabled,
-      subscriptionId: finalUser.subscriptionId,
-      paymentUpdatedAt: finalUser.paymentUpdatedAt
-    });
-    
-    console.log(`Webhook processed successfully for event: ${eventType}`);
-    return res.status(200).json({ received: true, status: 'processed' });
-  } catch (error) {
-    console.error('Webhook error:', error);
-    console.error('Error stack:', error.stack);
-    return res.status(200).json({ message: 'Webhook error', error: error.message });
-  }
+      return res.status(200).json({ ok: true });
 });
 
 // Route to check user's current payment status
@@ -407,12 +256,17 @@ router.get('/status', auth, async (req, res) => {
     const activeSubscription = await subscriptionService.getActiveSubscription(req.user.id);
     
     // If user has a subscription ID, fetch details from Paddle API
-    let cardBrand = "";
-    let cardLastFour = "";
+    let cardBrand = user.cardBrand || "";
+    let cardLastFour = user.cardLastFour || "";
     let customerPortalUrl = "";
     let cancelSubscriptionUrl = "";
     let subscriptionDetails = null;
     let paddleError = null;
+    
+    console.log('User card details from database:', { 
+      cardBrand: user.cardBrand, 
+      cardLastFour: user.cardLastFour 
+    });
     
     if (activeSubscription) {
       try {
@@ -495,8 +349,8 @@ router.get('/status', auth, async (req, res) => {
       quotesEnabled: user.quotesEnabled,
       subscriptionStatus: user.subscriptionStatus,
       subscriptionId: user.subscriptionId,
-      cardBrand,
-      cardLastFour,
+      cardBrand: user.cardBrand,
+      cardLastFour: user.cardLastFour,
       customerPortalUrl,
       cancelSubscriptionUrl,
       subscriptionDetails,
@@ -504,7 +358,12 @@ router.get('/status', auth, async (req, res) => {
       error: paddleError
     };
     
-    console.log('Sending payment status response:', JSON.stringify(response, null, 2));
+    console.log('Sending payment status response with card details:', {
+      cardBrand: response.cardBrand,
+      cardLastFour: response.cardLastFour
+    });
+    
+    console.log('Final response being sent:', JSON.stringify(response, null, 2));
     return res.json(response);
   } catch (error) {
     console.error('Error checking payment status:', error);
@@ -696,7 +555,14 @@ router.post('/admin/force-upgrade', async (req, res) => {
 // Route to update user payment data
 router.post('/update-user-data', auth, async (req, res) => {
   try {
-    const { subscriptionId, subscriptionStatus, paymentInformation } = req.body;
+    const { subscriptionId, subscriptionStatus, cardBrand, cardLastFour, firstPaymentDate, nextPaymentDate } = req.body;
+    
+    console.log('Received update-user-data request with card details:', {
+      cardBrand,
+      cardLastFour,
+      subscriptionId,
+      subscriptionStatus
+    });
     
     if (!subscriptionId) {
       return res.status(400).json({ error: 'Subscription ID is required' });
@@ -706,27 +572,45 @@ router.post('/update-user-data', auth, async (req, res) => {
     const formattedSubscriptionId = subscriptionId;
     console.log(`Using subscription ID: ${formattedSubscriptionId}`);
     
+    // Get current date in Israel timezone
+    const now = new Date();
+    const israelTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+    
+    // Calculate next payment date (same date next month)
+    const calculatedNextPaymentDate = new Date(israelTime);
+    calculatedNextPaymentDate.setMonth(calculatedNextPaymentDate.getMonth() + 1);
+    
     // Update user's subscription data
+    const updateData = {
+      subscriptionId: formattedSubscriptionId,
+      subscriptionStatus: subscriptionStatus || 'active',
+      isPay: true,
+      quotesEnabled: true,
+      isRegistrationComplete: true,
+      paymentUpdatedAt: new Date(),
+      cardBrand: cardBrand,
+      cardLastFour: cardLastFour,
+      'lastCheckoutAttempt.firstPaymentDate': firstPaymentDate || israelTime,
+      'lastCheckoutAttempt.nextPaymentDate': nextPaymentDate || calculatedNextPaymentDate,
+      'lastCheckoutAttempt.timestamp': new Date()
+    };
+    
+    console.log('Updating user with data:', updateData);
+    
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      {
-        subscriptionId: formattedSubscriptionId,
-        subscriptionStatus: subscriptionStatus || 'active',
-        isPay: true,
-        quotesEnabled: true,
-        isRegistrationComplete: true,
-        paymentUpdatedAt: new Date(), 
-        ...(paymentInformation && {
-          cardBrand: paymentInformation.cardBrand,
-          cardLastFour: paymentInformation.lastFour
-        })
-      },
+      updateData,
       { new: true }
     );
     
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+    
+    console.log('User updated successfully with card details:', {
+      cardBrand: user.cardBrand,
+      cardLastFour: user.cardLastFour
+    });
     
     return res.json({
       success: true,
@@ -738,7 +622,9 @@ router.post('/update-user-data', auth, async (req, res) => {
         quotesEnabled: user.quotesEnabled,
         isRegistrationComplete: user.isRegistrationComplete,
         cardBrand: user.cardBrand,
-        cardLastFour: user.cardLastFour
+        cardLastFour: user.cardLastFour,
+        firstPaymentDate: user.lastCheckoutAttempt?.firstPaymentDate,
+        nextPaymentDate: user.lastCheckoutAttempt?.nextPaymentDate
       }
     });
   } catch (error) {

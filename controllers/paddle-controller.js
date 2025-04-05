@@ -13,23 +13,7 @@ const paddleApi = axios.create({
   }
 });
 
-// Verify a webhook signature from Paddle
-const verifyWebhookSignature = (signature, body) => {
-  if (!process.env.PADDLE_WEBHOOK_SECRET) {
-    console.error('⚠️ PADDLE_WEBHOOK_SECRET is not set in environment variables');
-    return false;
-  }
 
-  try {
-    const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
-    const hmac = crypto.createHmac('sha256', process.env.PADDLE_WEBHOOK_SECRET);
-    const calculatedSignature = hmac.update(bodyString).digest('hex');
-    return calculatedSignature === signature;
-  } catch (error) {
-    console.error('Error verifying webhook signature:', error);
-    return false;
-  }
-};
 
 // Process successful payment
 const processSuccessfulPayment = async (userId, subscriptionId) => {
@@ -114,6 +98,13 @@ const processSuccessfulPayment = async (userId, subscriptionId) => {
 // Send receipt email
 const sendReceiptEmail = async (user, { orderId }) => {
   try {
+    console.log('Preparing to send receipt email to:', user.email);
+    console.log('Email configuration:', {
+      service: 'gmail',
+      user: process.env.EMAIL_USER ? 'Set' : 'Not set',
+      password: process.env.EMAIL_PASSWORD ? 'Set' : 'Not set'
+    });
+    
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -123,23 +114,42 @@ const sendReceiptEmail = async (user, { orderId }) => {
     });
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
       to: user.email,
       subject: 'Payment Receipt - DailyInspire',
       html: `
-        <h1>Thank you for your payment!</h1>
-        <p>Dear ${user.name || 'Valued Customer'},</p>
-        <p>Your payment has been processed successfully.</p>
-        <p>Order ID: ${orderId}</p>
-        <p>You now have access to all premium features.</p>
-        <p>Best regards,<br>The DailyInspire Team</p>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+          <h1>Thank you for your payment!</h1>
+          <p>Dear ${user.first_name || 'Valued Customer'},</p>
+          <p>Your payment has been processed successfully.</p>
+          <p><strong>Order ID:</strong> ${orderId}</p>
+          <p>You now have access to all premium features.</p>
+          
+          <div style="margin: 30px 0; padding: 20px; background-color: #f8f9fa; border-radius: 8px;">
+            <h3>Manage Your Subscription</h3>
+            <p>You can manage your subscription anytime through our customer portal:</p>
+            <p><a href="https://customer-portal.paddle.com/cpl_01jq9rqdm30n58mzpn6dcr7wbd" style="display: inline-block; background-color: #0066cc; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-top: 10px;">Manage Subscription</a></p>
+          </div>
+          
+          <p>Best regards,<br>The DailyInspire Team</p>
+        </div>
       `
     };
 
-    await transporter.sendMail(mailOptions);
-    console.log('Receipt email sent successfully');
+    console.log('Sending receipt email to:', user.email);
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`Receipt email sent successfully to ${user.email}. Message ID: ${info.messageId}`);
+    return info;
   } catch (error) {
     console.error('Error sending receipt email:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode,
+      stack: error.stack
+    });
     // Don't throw the error, just log it
   }
 };
@@ -271,7 +281,6 @@ const generateClientToken = async (userId) => {
 
 module.exports = {
   paddleApi,
-  verifyWebhookSignature,
   processSuccessfulPayment,
   sendReceiptEmail,
   getUserPaymentStatus,
