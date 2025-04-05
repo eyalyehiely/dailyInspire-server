@@ -115,22 +115,39 @@ router.get('/checkout-info', auth, async (req, res) => {
 
 // Webhook endpoint for Paddle to handle all subscription events
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
-  let signature;
-  let rawRequestBody;
-  
   try {
     console.log('===== WEBHOOK RECEIVED =====');
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
     
-    signature = (req.headers['paddle-signature'] || '');
-    rawRequestBody = req.body.toString();
-    const secretKey = process.env['WEBHOOK_SECRET_KEY'] || '';
-
-    if (!signature || !rawRequestBody) {
-      console.error('Missing webhook signature or body');
-      return res.status(400).json({ error: 'Missing webhook signature or body' });
+    // Get the signature from the header
+    const signature = req.headers['paddle-signature'];
+    if (!signature) {
+      console.error('Missing Paddle-Signature header');
+      return res.status(400).json({ error: 'Missing Paddle-Signature header' });
     }
-
+    
+    // Get the raw body before any parsing
+    const rawRequestBody = req.body.toString();
+    if (!rawRequestBody) {
+      console.error('Empty request body');
+      return res.status(400).json({ error: 'Empty request body' });
+    }
+    
+    // Get the webhook secret key
+    const secretKey = process.env['WEBHOOK_SECRET_KEY'];
+    if (!secretKey) {
+      console.error('WEBHOOK_SECRET_KEY is not set in environment variables');
+      return res.status(500).json({ error: 'Webhook configuration error' });
+    }
+    
+    console.log('Webhook verification details:', {
+      hasSignature: !!signature,
+      signatureLength: signature.length,
+      bodyLength: rawRequestBody.length,
+      hasSecretKey: !!secretKey
+    });
+    
+    // Verify the webhook signature and get event data
     const eventData = await paddle.webhooks.unmarshal(
       rawRequestBody,
       secretKey,
@@ -247,8 +264,8 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     }
   } catch (error) {
     console.error('Error processing webhook:', error);
-    console.error('Webhook signature:', signature);
-    console.error('Raw body length:', rawRequestBody.length);
+    console.error('Webhook signature:', req.headers['paddle-signature']);
+    console.error('Raw body length:', req.body?.toString().length);
     return res.status(401).json({ error: 'Invalid webhook signature' });
   }
 });
