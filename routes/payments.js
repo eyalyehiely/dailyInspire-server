@@ -134,6 +134,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     }
     
     console.log('Received Paddle-Signature:', signature);
+    console.log('Raw body length:', rawBody.length);
     
     try {
       // Use Paddle SDK to verify and unmarshal the webhook
@@ -253,6 +254,8 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       }
     } catch (error) {
       console.error('Error processing webhook:', error);
+      console.error('Webhook signature:', signature);
+      console.error('Raw body length:', rawBody.length);
       return res.status(401).json({ error: 'Invalid webhook signature' });
     }
   } catch (error) {
