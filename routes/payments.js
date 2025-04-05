@@ -117,6 +117,7 @@ router.get('/checkout-info', auth, async (req, res) => {
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   try {
     console.log('===== WEBHOOK RECEIVED =====');
+    console.log('Request ID:', req.headers['x-railway-request-id']);
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
     
     // Get the signature from the header
@@ -126,12 +127,23 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       return res.status(400).json({ error: 'Missing Paddle-Signature header' });
     }
     
-    // Get the raw body before any parsing
-    const rawRequestBody = req.body.toString();
-    if (!rawRequestBody) {
-      console.error('Empty request body');
-      return res.status(400).json({ error: 'Empty request body' });
+    // Log the raw request details
+    console.log('Raw request details:', {
+      isBuffer: Buffer.isBuffer(req.body),
+      bufferLength: req.body?.length,
+      contentType: req.headers['content-type'],
+      contentLength: req.headers['content-length'],
+      userAgent: req.headers['user-agent']
+    });
+    
+    // Ensure we have the raw body as a Buffer
+    if (!Buffer.isBuffer(req.body)) {
+      console.error('Request body is not a Buffer');
+      return res.status(400).json({ error: 'Invalid request body format' });
     }
+    
+    // Create a copy of the buffer to ensure it hasn't been modified
+    const rawBody = Buffer.from(req.body);
     
     // Get the webhook secret key
     const secretKey = process.env['PADDLE_WEBHOOK_SECRET'];
@@ -140,16 +152,18 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       return res.status(500).json({ error: 'Webhook configuration error' });
     }
     
+    // Log verification details
     console.log('Webhook verification details:', {
-      hasSignature: !!signature,
-      signatureLength: signature.length,
-      bodyLength: rawRequestBody.length,
-      hasSecretKey: !!secretKey
+      signature,
+      bodyLength: rawBody.length,
+      contentType: req.headers['content-type'],
+      contentLength: req.headers['content-length'],
+      timestamp: new Date().toISOString()
     });
     
     // Verify the webhook signature and get event data
     const eventData = await paddle.webhooks.unmarshal(
-      rawRequestBody,
+      rawBody,  // Use the copied buffer
       secretKey,
       signature
     );
