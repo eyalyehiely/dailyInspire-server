@@ -124,6 +124,7 @@ router.post('/webhook', async (req, res) => {
           console.log('Event Data:', JSON.stringify(eventData, null, 2));
 
           switch (eventData.eventType) {
+            // Activate subscription
             case EventName.SubscriptionActivated:
               console.log(`Subscription ${eventData.data.id} was activated`);
               break;
@@ -140,9 +141,10 @@ router.post('/webhook', async (req, res) => {
                 
               }
               break;
+
+      // Cancel subscription
             case EventName.SubscriptionCanceled:
               console.log(`Subscription ${eventData.data.id} was cancelled`);
-              case EventName.SubscriptionCanceled:
               console.log('\n===== PROCESSING SUBSCRIPTION CANCELLED =====');
               try {
                 const userId = eventData.data?.customData?.user_id;
@@ -201,19 +203,30 @@ router.post('/webhook', async (req, res) => {
                 console.error('Error stack:', error.stack);
                 return res.status(500).json({ error: 'Failed to process subscription cancellation' });
               }
+            case EventName.TransactionPaymentFailed:
+              console.log(`Transaction ${eventData.data.id} payment failed`);
+              try {
+                const userId = eventData.data?.customData?.user_id;
+                await sendPaymentFailedEmail(userId);
+              } catch (error) {
+                console.error('❌ Error processing transaction payment failure:', error);
+                console.error('Error stack:', error.stack);
+                return res.status(500).json({ error: 'Failed to process transaction payment failure' });
+              }
               break;
-              case EventName.TransactionPaymentFailed:
-                console.log(`Transaction ${eventData.data.id} payment failed`);
-                try {
-                  const userId = eventData.data?.customData?.user_id;
-                  await sendPaymentFailedEmail(userId);
-                } catch (error) {
-                  console.error('❌ Error processing transaction payment failure:', error);
-                  console.error('Error stack:', error.stack);
-                  return res.status(500).json({ error: 'Failed to process transaction payment failure' });
-                }
-
-
+            case EventName.SubscriptionPaymentMethodUpdated:
+              console.log(`Subscription ${eventData.data.id} payment method updated`);
+              try {
+                const userId = eventData.data?.customData?.user_id;
+                const user = await User.findById(userId);
+                user.cardBrand = eventData.data?.payment_information?.card_brand;
+                user.cardLastFour = eventData.data?.payment_information?.last_four;
+                await user.save();
+                console.log('✅ User card details updated successfully');
+              } catch (error) {
+                console.error('❌ Error processing payment method update:', error);
+                console.error('Error stack:', error.stack);
+              }
               break;
             default:
               console.log(`Unknown event type: ${eventData.eventType}`);
