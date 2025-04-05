@@ -159,6 +159,66 @@ router.post('/webhook', async (req, res) => {
               break;
             case EventName.SubscriptionCanceled:
               console.log(`Subscription ${eventData.data.id} was cancelled`);
+              case EventName.SubscriptionCanceled:
+              console.log('\n===== PROCESSING SUBSCRIPTION CANCELLED =====');
+              try {
+                const customerEmail = eventData.data?.customer?.email || eventData.data?.customer_email;
+                console.log('Customer Email from webhook:', customerEmail);
+                console.log('Webhook Customer Data:', JSON.stringify(eventData.data?.customer, null, 2));
+                
+                if (!customerEmail) {
+                  console.error('❌ No customer email found in webhook data');
+                  return res.status(400).json({ error: 'No customer email found' });
+                }
+
+                const user = await User.findOne({ email: customerEmail });
+                console.log('User Found:', user ? 'Yes' : 'No');
+                console.log('User Details:', {
+                  id: user?._id,
+                  email: user?.email,
+                  isPay: user?.isPay,
+                  subscriptionStatus: user?.subscriptionStatus
+                });
+                
+                if (!user) {
+                  console.error('❌ User not found for email:', customerEmail);
+                  return res.status(404).json({ error: 'User not found' });
+                }
+
+                const updateData = {
+                  subscriptionStatus: 'canceled',
+                  isPay: false,
+                  quotesEnabled: false,
+                  paymentUpdatedAt: new Date(),
+                  canceledAt: new Date()
+                };
+                console.log('Updating user with data:', updateData);
+
+                const updatedUser = await User.findByIdAndUpdate(user._id, updateData, { new: true });
+                console.log('✅ User updated successfully');
+                console.log('Updated User Status:', {
+                  isPay: updatedUser.isPay,
+                  subscriptionStatus: updatedUser.subscriptionStatus,
+                  email: updatedUser.email
+                });
+
+                return res.status(200).json({ 
+                  success: true, 
+                  message: 'Subscription cancelled successfully',
+                  user: {
+                    id: updatedUser._id,
+                    email: updatedUser.email,
+                    subscriptionStatus: updatedUser.subscriptionStatus
+                  }
+                });
+              } catch (error) {
+                console.error('❌ Error processing subscription cancellation:', error);
+                console.error('Error stack:', error.stack);
+                return res.status(500).json({ error: 'Failed to process subscription cancellation' });
+              }
+              break;
+
+
               break;
             default:
               console.log(`Unknown event type: ${eventData.eventType}`);
