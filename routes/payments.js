@@ -176,11 +176,18 @@ router.post('/webhooks', verifyPaddleIP, express.raw({ type: 'application/json' 
       return res.status(400).json({ error: 'Missing Paddle-Signature header' });
     }
 
-    // Get the raw request body
-    const rawRequestBody = req.body.toString();
+    // Get the raw request body as a Buffer
+    const rawBody = req.body;
+    if (!Buffer.isBuffer(rawBody)) {
+      console.error('❌ Request body is not a Buffer');
+      return res.status(400).json({ error: 'Invalid request body format' });
+    }
+
+    // Convert the raw body to a string for verification
+    const rawRequestBody = rawBody.toString('utf8');
     if (!rawRequestBody) {
-      console.error('❌ Missing request body');
-      return res.status(400).json({ error: 'Missing request body' });
+      console.error('❌ Empty request body');
+      return res.status(400).json({ error: 'Empty request body' });
     }
 
     // Get the webhook secret from environment variables
@@ -194,7 +201,7 @@ router.post('/webhooks', verifyPaddleIP, express.raw({ type: 'application/json' 
     console.log('Webhook Verification Details:', {
       signature,
       secretKey: secretKey ? 'Present' : 'Missing',
-      bodyLength: rawRequestBody.length,
+      bodyLength: rawBody.length,
       bodyPreview: rawRequestBody.substring(0, 100) + '...',
       headers: {
         'paddle-signature': signature,
