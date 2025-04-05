@@ -332,6 +332,77 @@ router.post('/webhooks', express.raw({ type: 'application/json' }), async (req, 
         case EventName.SubscriptionUpdated:
           console.log(`Subscription ${eventData.data.id} was updated`);
           break;
+
+        case EventName.SubscriptionCreated:
+          console.log(`Subscription ${eventData.data.id} was created`);
+          
+          break;
+
+        case EventName.SubscriptionPaymentSucceeded:
+          console.log(`Subscription ${eventData.data.id} payment succeeded`);
+          break;
+
+        case EventName.SubscriptionCanceled:
+          console.log(`Subscription ${eventData.data.id} was canceled`);
+          await User.findByIdAndUpdate(eventData.data.customer_email, {
+            subscriptionStatus: 'canceled',
+            isPay: false,
+            quotesEnabled: false,
+            paymentUpdatedAt: new Date(),
+            canceledAt: new Date()
+          });
+
+          break;
+
+        case EventName.SubscriptionPaused:
+          console.log(`Subscription ${eventData.data.id} was paused`);
+          break;
+
+        case EventName.SubscriptionResumed:
+          console.log(`Subscription ${eventData.data.id} was resumed`);
+          break;
+
+        case EventName.CheckoutCompleted:
+          console.log(`Checkout ${eventData.data.id} was completed`);
+          sendWelcomeEmail(eventData.data.customer_email);
+          break;
+
+        case EventName.CheckoutUpdated:
+          console.log(`Checkout ${eventData.data.id} was updated`);
+          break;
+
+        case EventName.CheckoutPaymentFailed:
+          console.log(`Checkout ${eventData.data.id} payment failed`);
+          break;
+
+        case EventName.CheckoutPaymentSucceeded:
+          console.log(`Checkout ${eventData.data.id} payment succeeded`);
+          break;
+
+        case EventName.CheckoutPaymentUpdated:
+          console.log(`Checkout ${eventData.data.id} payment updated`);
+          await User.findByIdAndUpdate(eventData.data.customer_email, {
+            paymentUpdatedAt: new Date(),
+            subscriptionStatus: 'active',
+            isPay: true,
+            quotesEnabled: true,
+            nextPaymentDate: eventData.data.next_payment_date,
+            subscriptionId: eventData.data.subscription_id,
+            cardBrand: eventData.data.payments[0].card_brand,
+            cardLastFour: eventData.data.payments[0].card_last4
+          });
+          break;
+
+        case EventName.CheckoutPaymentDisputed:
+          console.log(`Checkout ${eventData.data.id} payment disputed`);
+          
+          break;
+
+        case EventName.CheckoutPaymentDisputeUpdated:
+          console.log(`Checkout ${eventData.data.id} payment dispute updated`);
+          break;
+          
+          
         default:
           console.log(eventData.eventType);
       }
