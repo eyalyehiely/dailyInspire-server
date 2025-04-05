@@ -14,6 +14,39 @@ const mongoose = require('mongoose');
 // Initialize Paddle SDK
 const paddle = new Paddle(process.env.PADDLE_API_KEY);
 
+// Paddle webhook IP addresses
+const PADDLE_WEBHOOK_IPS = {
+  sandbox: [
+    '34.194.127.46',
+    '54.234.237.108',
+    '3.208.120.145',
+    '44.226.236.210',
+    '44.241.183.62',
+    '100.20.172.113'
+  ],
+  live: [
+    '34.232.58.13',
+    '34.195.105.136',
+    '34.237.3.244',
+    '35.155.119.135',
+    '52.11.166.252',
+    '34.212.5.7'
+  ]
+};
+
+// Middleware to verify Paddle IP
+const verifyPaddleIP = (req, res, next) => {
+  const clientIP = req.ip;
+  const isSandbox = process.env.NODE_ENV === 'development';
+  const allowedIPs = isSandbox ? PADDLE_WEBHOOK_IPS.sandbox : PADDLE_WEBHOOK_IPS.live;
+  
+  if (!allowedIPs.includes(clientIP)) {
+    console.error('❌ Unauthorized IP:', clientIP);
+    return res.status(403).json({ error: 'Unauthorized IP address' });
+  }
+  next();
+};
+
 // Route to get payment page information
 router.get('/checkout-info', auth, async (req, res) => {
   try {
@@ -110,324 +143,323 @@ router.get('/checkout-info', auth, async (req, res) => {
 });
 
 // Create a `POST` endpoint to accept webhooks sent by Paddle.
-router.post('/webhooks', express.raw({ type: 'application/json' }), async (req, res) => {
+router.post('/webhooks', verifyPaddleIP, express.raw({ type: 'application/json' }), async (req, res) => {
   console.log('\n===== NEW WEBHOOK RECEIVED =====');
   console.log('Timestamp:', new Date().toISOString());
   console.log('Headers:', JSON.stringify(req.headers, null, 2));
   
   try {
-    const signature = (req.headers['paddle-signature']) || '';
-    console.log('Paddle Signature:', signature ? 'Present' : 'Missing');
-    
-    const rawRequestBody = req.body.toString();
-    console.log('Request Body Length:', rawRequestBody.length);
-    console.log('Request Body Preview:', rawRequestBody.substring(0, 500) + '...');
-    
-    const secretKey = process.env['PADDLE_WEBHOOK_SECRET'] || '';
-    console.log('Webhook Secret:', secretKey ? 'Present' : 'Missing');
+    // Get the signature from the Paddle-Signature header
+    const signature = req.headers['paddle-signature'];
+    if (!signature) {
+      console.error('❌ Missing Paddle-Signature header');
+      return res.status(400).json({ error: 'Missing Paddle-Signature header' });
+    }
 
-    if (!signature || !rawRequestBody) {
-      console.error('❌ Missing signature or request body');
-      return res.status(400).json({ error: 'Missing signature or request body' });
+    // Get the raw request body
+    const rawRequestBody = req.body.toString();
+    if (!rawRequestBody) {
+      console.error('❌ Missing request body');
+      return res.status(400).json({ error: 'Missing request body' });
+    }
+
+    // Get the webhook secret from environment variables
+    const secretKey = process.env.PADDLE_WEBHOOK_SECRET;
+    if (!secretKey) {
+      console.error('❌ Missing PADDLE_WEBHOOK_SECRET environment variable');
+      return res.status(500).json({ error: 'Server configuration error' });
     }
 
     try {
-      console.log('\n===== PROCESSING WEBHOOK =====');
+      // Verify the webhook signature using Paddle's SDK
       const eventData = await paddle.webhooks.unmarshal(rawRequestBody, secretKey, signature);
       console.log('✅ Webhook signature verified successfully');
       console.log('Event Type:', eventData.eventType);
       console.log('Full Event Data:', JSON.stringify(eventData, null, 2));
       
-      switch (eventData.eventType) {
-        case EventName.CheckoutCompleted:
-          console.log('\n===== PROCESSING CHECKOUT COMPLETED =====');
-          try {
-            const customerEmail = eventData.data?.customer?.email || eventData.data?.customer_email;
-            console.log('Customer Email from webhook:', customerEmail);
-            console.log('Webhook Customer Data:', JSON.stringify(eventData.data?.customer, null, 2));
-            
-            if (!customerEmail) {
-              console.error('❌ No customer email found in webhook data');
-              return res.status(400).json({ error: 'No customer email found' });
-            }
-
-            const user = await User.findOne({ email: customerEmail });
-            console.log('User Found:', user ? 'Yes' : 'No');
-            console.log('User Details:', {
-              id: user?._id,
-              email: user?.email,
-              isPay: user?.isPay,
-              subscriptionStatus: user?.subscriptionStatus
-            });
-            
-            if (!user) {
-              console.error('❌ User not found for email:', customerEmail);
-              return res.status(404).json({ error: 'User not found' });
-            }
-
-            const updateData = {
-              subscriptionStatus: 'active',
-              isPay: true,
-              quotesEnabled: true,
-              paymentUpdatedAt: new Date(),
-              subscriptionId: eventData.data?.subscription_id || eventData.data?.id
-            };
-            console.log('Updating user with data:', updateData);
-
-            const updatedUser = await User.findByIdAndUpdate(user._id, updateData, { new: true });
-            console.log('✅ User updated successfully');
-            console.log('Updated User Status:', {
-              isPay: updatedUser.isPay,
-              subscriptionStatus: updatedUser.subscriptionStatus,
-              email: updatedUser.email
-            });
-
-            console.log('\n===== ATTEMPTING TO SEND WELCOME EMAIL =====');
-            console.log('Email Configuration:', {
-              from: process.env.EMAIL_FROM,
-              to: updatedUser.email,
-              subject: 'Welcome to DailyInspire'
-            });
-
-            try {
-              await sendWelcomeEmail(updatedUser);
-              console.log('✅ Welcome email sent successfully to:', updatedUser.email);
-            } catch (emailError) {
-              console.error('❌ Error sending welcome email:', emailError);
-              console.error('Email Error Stack:', emailError.stack);
-              console.error('Email Configuration:', {
-                from: process.env.EMAIL_FROM,
-                to: updatedUser.email,
-                subject: 'Welcome to DailyInspire'
-              });
-            }
-          } catch (error) {
-            console.error('❌ Error processing checkout completed:', error);
-            console.error('Error stack:', error.stack);
-          }
-          break;
-
-        case EventName.SubscriptionPaymentSucceeded:
-          console.log('\n===== PROCESSING SUBSCRIPTION PAYMENT SUCCEEDED =====');
-          try {
-            const customerEmail = eventData.data?.customer?.email || eventData.data?.customer_email;
-            console.log('Customer Email:', customerEmail);
-            
-            if (!customerEmail) {
-              console.error('❌ No customer email found in webhook data');
-              return res.status(400).json({ error: 'No customer email found' });
-            }
-
-            const user = await User.findOne({ email: customerEmail });
-            console.log('User Found:', user ? 'Yes' : 'No');
-            console.log('Current User Status:', {
-              isPay: user?.isPay,
-              subscriptionStatus: user?.subscriptionStatus
-            });
-            
-            if (!user) {
-              console.error('❌ User not found for email:', customerEmail);
-              return res.status(404).json({ error: 'User not found' });
-            }
-
-            const updateData = {
-              subscriptionStatus: 'active',
-              isPay: true,
-              quotesEnabled: true,
-              paymentUpdatedAt: new Date(),
-              subscriptionId: eventData.data?.subscription_id || eventData.data?.id
-            };
-            console.log('Updating user with data:', updateData);
-
-            const updatedUser = await User.findByIdAndUpdate(user._id, updateData, { new: true });
-            console.log('✅ User updated successfully');
-            console.log('Updated User Status:', {
-              isPay: updatedUser.isPay,
-              subscriptionStatus: updatedUser.subscriptionStatus
-            });
-
-            if (!user.isPay) {
-              console.log('First payment detected, sending welcome email...');
+      // Immediately respond with 200 to acknowledge receipt
+      res.status(200).json({ received: true });
+      
+      // Process the webhook event asynchronously
+      process.nextTick(async () => {
+        try {
+          // Process the webhook event based on its type
+          switch (eventData.eventType) {
+            case EventName.CheckoutCompleted:
+              console.log('\n===== PROCESSING CHECKOUT COMPLETED =====');
               try {
-                await sendWelcomeEmail(updatedUser);
-                console.log('✅ Welcome email sent successfully');
-              } catch (emailError) {
-                console.error('❌ Error sending welcome email:', emailError);
-                console.error('Email Error Stack:', emailError.stack);
+                const customerEmail = eventData.data?.customer?.email || eventData.data?.customer_email;
+                console.log('Customer Email from webhook:', customerEmail);
+                console.log('Webhook Customer Data:', JSON.stringify(eventData.data?.customer, null, 2));
+                
+                if (!customerEmail) {
+                  console.error('❌ No customer email found in webhook data');
+                  return res.status(400).json({ error: 'No customer email found' });
+                }
+
+                const user = await User.findOne({ email: customerEmail });
+                console.log('User Found:', user ? 'Yes' : 'No');
+                console.log('User Details:', {
+                  id: user?._id,
+                  email: user?.email,
+                  isPay: user?.isPay,
+                  subscriptionStatus: user?.subscriptionStatus
+                });
+                
+                if (!user) {
+                  console.error('❌ User not found for email:', customerEmail);
+                  return res.status(404).json({ error: 'User not found' });
+                }
+
+                const updateData = {
+                  subscriptionStatus: 'active',
+                  isPay: true,
+                  quotesEnabled: true,
+                  paymentUpdatedAt: new Date(),
+                  subscriptionId: eventData.data?.subscription_id || eventData.data?.id
+                };
+                console.log('Updating user with data:', updateData);
+
+                const updatedUser = await User.findByIdAndUpdate(user._id, updateData, { new: true });
+                console.log('✅ User updated successfully');
+                console.log('Updated User Status:', {
+                  isPay: updatedUser.isPay,
+                  subscriptionStatus: updatedUser.subscriptionStatus,
+                  email: updatedUser.email
+                });
+
+                console.log('\n===== ATTEMPTING TO SEND WELCOME EMAIL =====');
+                console.log('Email Configuration:', {
+                  from: process.env.EMAIL_FROM,
+                  to: updatedUser.email,
+                  subject: 'Welcome to DailyInspire'
+                });
+
+                try {
+                  await sendWelcomeEmail(updatedUser);
+                  console.log('✅ Welcome email sent successfully to:', updatedUser.email);
+                } catch (emailError) {
+                  console.error('❌ Error sending welcome email:', emailError);
+                  console.error('Email Error Stack:', emailError.stack);
+                  console.error('Email Configuration:', {
+                    from: process.env.EMAIL_FROM,
+                    to: updatedUser.email,
+                    subject: 'Welcome to DailyInspire'
+                  });
+                }
+              } catch (error) {
+                console.error('❌ Error processing checkout completed:', error);
+                console.error('Error stack:', error.stack);
+              }
+              break;
+
+            case EventName.SubscriptionPaymentSucceeded:
+              console.log('\n===== PROCESSING SUBSCRIPTION PAYMENT SUCCEEDED =====');
+              try {
+                const customerEmail = eventData.data?.customer?.email || eventData.data?.customer_email;
+                console.log('Customer Email:', customerEmail);
+                
+                if (!customerEmail) {
+                  console.error('❌ No customer email found in webhook data');
+                  return res.status(400).json({ error: 'No customer email found' });
+                }
+
+                const user = await User.findOne({ email: customerEmail });
+                console.log('User Found:', user ? 'Yes' : 'No');
+                console.log('Current User Status:', {
+                  isPay: user?.isPay,
+                  subscriptionStatus: user?.subscriptionStatus
+                });
+                
+                if (!user) {
+                  console.error('❌ User not found for email:', customerEmail);
+                  return res.status(404).json({ error: 'User not found' });
+                }
+
+                const updateData = {
+                  subscriptionStatus: 'active',
+                  isPay: true,
+                  quotesEnabled: true,
+                  paymentUpdatedAt: new Date(),
+                  subscriptionId: eventData.data?.subscription_id || eventData.data?.id
+                };
+                console.log('Updating user with data:', updateData);
+
+                const updatedUser = await User.findByIdAndUpdate(user._id, updateData, { new: true });
+                console.log('✅ User updated successfully');
+                console.log('Updated User Status:', {
+                  isPay: updatedUser.isPay,
+                  subscriptionStatus: updatedUser.subscriptionStatus
+                });
+
+                if (!user.isPay) {
+                  console.log('First payment detected, sending welcome email...');
+                  try {
+                    await sendWelcomeEmail(updatedUser);
+                    console.log('✅ Welcome email sent successfully');
+                  } catch (emailError) {
+                    console.error('❌ Error sending welcome email:', emailError);
+                    console.error('Email Error Stack:', emailError.stack);
+                    // Don't fail the webhook for email errors
+                  }
+                } else {
+                  console.log('Not first payment, skipping welcome email');
+                }
+              } catch (error) {
+                console.error('❌ Error processing subscription payment succeeded:', error);
+                console.error('Error stack:', error.stack);
+              }
+              break;
+
+            case EventName.SubscriptionCanceled:
+              console.log('\n===== PROCESSING SUBSCRIPTION CANCELLED =====');
+              try {
+                const customerEmail = eventData.data?.customer?.email || eventData.data?.customer_email;
+                console.log('Customer Email from webhook:', customerEmail);
+                console.log('Webhook Customer Data:', JSON.stringify(eventData.data?.customer, null, 2));
+                
+                if (!customerEmail) {
+                  console.error('❌ No customer email found in webhook data');
+                  return res.status(400).json({ error: 'No customer email found' });
+                }
+
+                const user = await User.findOne({ email: customerEmail });
+                console.log('User Found:', user ? 'Yes' : 'No');
+                console.log('User Details:', {
+                  id: user?._id,
+                  email: user?.email,
+                  isPay: user?.isPay,
+                  subscriptionStatus: user?.subscriptionStatus
+                });
+                
+                if (!user) {
+                  console.error('❌ User not found for email:', customerEmail);
+                  return res.status(404).json({ error: 'User not found' });
+                }
+
+                const updateData = {
+                  subscriptionStatus: 'canceled',
+                  isPay: false,
+                  quotesEnabled: false,
+                  paymentUpdatedAt: new Date(),
+                  canceledAt: new Date()
+                };
+                console.log('Updating user with data:', updateData);
+
+                const updatedUser = await User.findByIdAndUpdate(user._id, updateData, { new: true });
+                console.log('✅ User updated successfully');
+                console.log('Updated User Status:', {
+                  isPay: updatedUser.isPay,
+                  subscriptionStatus: updatedUser.subscriptionStatus,
+                  email: updatedUser.email
+                });
+
+                return res.status(200).json({ 
+                  success: true, 
+                  message: 'Subscription cancelled successfully',
+                  user: {
+                    id: updatedUser._id,
+                    email: updatedUser.email,
+                    subscriptionStatus: updatedUser.subscriptionStatus
+                  }
+                });
+              } catch (error) {
+                console.error('❌ Error processing subscription cancellation:', error);
+                console.error('Error stack:', error.stack);
+                return res.status(500).json({ error: 'Failed to process subscription cancellation' });
+              }
+              break;
+
+            case EventName.ProductUpdated:
+              console.log(`Product ${eventData.data.id} was updated`);
+              break;
+
+            case EventName.SubscriptionUpdated:
+              console.log(`Subscription ${eventData.data.id} was updated`);
+              break;
+
+            case EventName.SubscriptionCreated:
+              console.log(`Subscription ${eventData.data.id} was created`);
+              break;
+
+            case EventName.SubscriptionPaused:
+              console.log(`Subscription ${eventData.data.id} was paused`);
+              break;
+
+            case EventName.SubscriptionResumed:
+              console.log(`Subscription ${eventData.data.id} was resumed`);
+              break;
+
+            case EventName.CheckoutUpdated:
+              console.log(`Checkout ${eventData.data.id} was updated`);
+              break;
+
+            case EventName.CheckoutPaymentFailed:
+              console.log(`Checkout ${eventData.data.id} payment failed`);
+              try {
+                await sendPaymentFailedEmail(eventData.data.customer_email);
+              } catch (error) {
+                console.error('Error sending payment failed email:', error);
                 // Don't fail the webhook for email errors
               }
-            } else {
-              console.log('Not first payment, skipping welcome email');
-            }
-          } catch (error) {
-            console.error('❌ Error processing subscription payment succeeded:', error);
-            console.error('Error stack:', error.stack);
-          }
-          break;
+              break;
 
-        case EventName.ProductUpdated:
-          console.log(`Product ${eventData.data.id} was updated`);
-          break;
+            case EventName.CheckoutPaymentSucceeded:
+              console.log(`Checkout ${eventData.data.id} payment succeeded`);
+              break;
 
-        case EventName.SubscriptionUpdated:
-          console.log(`Subscription ${eventData.data.id} was updated`);
-          break;
-
-        case EventName.SubscriptionCreated:
-          console.log(`Subscription ${eventData.data.id} was created`);
-          break;
-
-        case EventName.SubscriptionCanceled:
-          console.log('\n===== PROCESSING SUBSCRIPTION CANCELLED =====');
-          try {
-            const customerEmail = eventData.data?.customer?.email || eventData.data?.customer_email;
-            console.log('Customer Email from webhook:', customerEmail);
-            console.log('Webhook Customer Data:', JSON.stringify(eventData.data?.customer, null, 2));
-            
-            if (!customerEmail) {
-              console.error('❌ No customer email found in webhook data');
-              return res.status(400).json({ error: 'No customer email found' });
-            }
-
-            const user = await User.findOne({ email: customerEmail });
-            console.log('User Found:', user ? 'Yes' : 'No');
-            console.log('User Details:', {
-              id: user?._id,
-              email: user?.email,
-              isPay: user?.isPay,
-              subscriptionStatus: user?.subscriptionStatus
-            });
-            
-            if (!user) {
-              console.error('❌ User not found for email:', customerEmail);
-              return res.status(404).json({ error: 'User not found' });
-            }
-
-            const updateData = {
-              subscriptionStatus: 'canceled',
-              isPay: false,
-              quotesEnabled: false,
-              paymentUpdatedAt: new Date(),
-              canceledAt: new Date()
-            };
-            console.log('Updating user with data:', updateData);
-
-            const updatedUser = await User.findByIdAndUpdate(user._id, updateData, { new: true });
-            console.log('✅ User updated successfully');
-            console.log('Updated User Status:', {
-              isPay: updatedUser.isPay,
-              subscriptionStatus: updatedUser.subscriptionStatus,
-              email: updatedUser.email
-            });
-
-            return res.status(200).json({ 
-              success: true, 
-              message: 'Subscription cancelled successfully',
-              user: {
-                id: updatedUser._id,
-                email: updatedUser.email,
-                subscriptionStatus: updatedUser.subscriptionStatus
+            case EventName.CheckoutPaymentUpdated:
+              console.log(`Checkout ${eventData.data.id} payment updated`);
+              try {
+                await User.findByIdAndUpdate(eventData.data.customer_email, {
+                  paymentUpdatedAt: new Date(),
+                  subscriptionStatus: 'active',
+                  isPay: true,
+                  quotesEnabled: true,
+                  nextPaymentDate: eventData.data.next_payment_date,
+                  subscriptionId: eventData.data.subscription_id,
+                  cardBrand: eventData.data.payments[0].card_brand,
+                  cardLastFour: eventData.data.payments[0].card_last4
+                });
+              } catch (error) {
+                console.error('Error updating user payment details:', error);
+                return res.status(500).json({ error: 'Failed to update user payment details' });
               }
-            });
-          } catch (error) {
-            console.error('❌ Error processing subscription cancellation:', error);
-            console.error('Error stack:', error.stack);
-            return res.status(500).json({ error: 'Failed to process subscription cancellation' });
+              break;
+
+            case EventName.CheckoutPaymentDisputed:
+              console.log(`Checkout ${eventData.data.id} payment disputed`);
+              break;
+
+            case EventName.CheckoutPaymentDisputeUpdated:
+              console.log(`Checkout ${eventData.data.id} payment dispute updated`);
+              break;
+
+            case EventName.TransactionPaid:
+              console.log(`Transaction ${eventData.data.id} was paid`);
+              try {
+                await sendWelcomeEmail(eventData.data.customer_email);
+              } catch (error) {
+                console.error('Error sending welcome email:', error);
+                // Don't fail the webhook for email errors
+              }
+              break;
+
+            default:
+              console.log(`Unhandled event type: ${eventData.eventType}`);
           }
-          break;
-
-        case EventName.SubscriptionPaused:
-          console.log(`Subscription ${eventData.data.id} was paused`);
-          break;
-
-        case EventName.SubscriptionResumed:
-          console.log(`Subscription ${eventData.data.id} was resumed`);
-          break;
-
-        case EventName.CheckoutUpdated:
-          console.log(`Checkout ${eventData.data.id} was updated`);
-          break;
-
-        case EventName.CheckoutPaymentFailed:
-          console.log(`Checkout ${eventData.data.id} payment failed`);
-          try {
-            await sendPaymentFailedEmail(eventData.data.customer_email);
-          } catch (error) {
-            console.error('Error sending payment failed email:', error);
-            // Don't fail the webhook for email errors
-          }
-          break;
-
-        case EventName.CheckoutPaymentSucceeded:
-          console.log(`Checkout ${eventData.data.id} payment succeeded`);
-          break;
-
-        case EventName.CheckoutPaymentUpdated:
-          console.log(`Checkout ${eventData.data.id} payment updated`);
-          try {
-            await User.findByIdAndUpdate(eventData.data.customer_email, {
-              paymentUpdatedAt: new Date(),
-              subscriptionStatus: 'active',
-              isPay: true,
-              quotesEnabled: true,
-              nextPaymentDate: eventData.data.next_payment_date,
-              subscriptionId: eventData.data.subscription_id,
-              cardBrand: eventData.data.payments[0].card_brand,
-              cardLastFour: eventData.data.payments[0].card_last4
-            });
-          } catch (error) {
-            console.error('Error updating user payment details:', error);
-            return res.status(500).json({ error: 'Failed to update user payment details' });
-          }
-          break;
-
-        case EventName.CheckoutPaymentDisputed:
-          console.log(`Checkout ${eventData.data.id} payment disputed`);
-          break;
-
-        case EventName.CheckoutPaymentDisputeUpdated:
-          console.log(`Checkout ${eventData.data.id} payment dispute updated`);
-          break;
-
-        case EventName.TransactionPaid:
-          console.log(`Transaction ${eventData.data.id} was paid`);
-          try {
-            await sendWelcomeEmail(eventData.data.customer_email);
-          } catch (error) {
-            console.error('Error sending welcome email:', error);
-            // Don't fail the webhook for email errors
-          }
-          break;
-
-        default:
-          console.log('\n===== UNHANDLED EVENT TYPE =====');
-          console.log('Event Type:', eventData.eventType);
-          console.log('Event Data:', JSON.stringify(eventData.data, null, 2));
-      }
-
-      console.log('\n===== WEBHOOK PROCESSING COMPLETE =====');
-      return res.status(200).json({ 
-        received: true, 
-        event: eventData.eventType,
-        timestamp: new Date().toISOString()
+        } catch (error) {
+          console.error('❌ Error processing webhook asynchronously:', error);
+          // Log the error but don't retry since we already responded
+        }
       });
     } catch (error) {
-      console.error('\n===== WEBHOOK PROCESSING ERROR =====');
-      console.error('Error:', error.message);
-      console.error('Error stack:', error.stack);
-      return res.status(400).json({ 
-        error: 'Invalid webhook signature or data',
-        details: error.message
-      });
+      console.error('❌ Webhook signature verification failed:', error.message);
+      return res.status(400).json({ error: 'Invalid webhook signature' });
     }
   } catch (error) {
-    console.error('\n===== UNEXPECTED ERROR =====');
-    console.error('Error:', error.message);
-    console.error('Error stack:', error.stack);
-    return res.status(500).json({ 
-      error: 'Internal server error',
-      details: error.message
-    });
+    console.error('❌ Unexpected error processing webhook:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 
