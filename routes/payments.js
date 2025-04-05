@@ -36,14 +36,34 @@ const PADDLE_WEBHOOK_IPS = {
 
 // Middleware to verify Paddle IP
 const verifyPaddleIP = (req, res, next) => {
-  const clientIP = req.ip;
+  // Get the client IP from x-forwarded-for header
+  const forwardedFor = req.headers['x-forwarded-for'];
+  const clientIP = forwardedFor ? forwardedFor.split(',')[0].trim() : req.ip;
+  
+  console.log('Checking IP:', {
+    clientIP,
+    forwardedFor,
+    directIP: req.ip,
+    headers: req.headers
+  });
+
   const isSandbox = process.env.NODE_ENV === 'development';
   const allowedIPs = isSandbox ? PADDLE_WEBHOOK_IPS.sandbox : PADDLE_WEBHOOK_IPS.live;
   
   if (!allowedIPs.includes(clientIP)) {
-    console.error('❌ Unauthorized IP:', clientIP);
-    return res.status(403).json({ error: 'Unauthorized IP address' });
+    console.error('❌ Unauthorized IP:', {
+      receivedIP: clientIP,
+      allowedIPs,
+      environment: isSandbox ? 'sandbox' : 'live'
+    });
+    return res.status(403).json({ 
+      error: 'Unauthorized IP address',
+      receivedIP: clientIP,
+      allowedIPs
+    });
   }
+  
+  console.log('✅ IP verification passed:', clientIP);
   next();
 };
 
