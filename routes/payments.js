@@ -14,28 +14,6 @@ const mongoose = require('mongoose');
 // Initialize Paddle SDK
 const paddle = new Paddle(process.env.PADDLE_API_KEY);
 
-// Paddle webhook IP addresses
-const PADDLE_WEBHOOK_IPS = {
-  sandbox: [
-    '34.194.127.46',
-    '54.234.237.108',
-    '3.208.120.145',
-    '44.226.236.210',
-    '44.241.183.62',
-    '100.20.172.113'
-  ],
-  live: [
-    '34.232.58.13',
-    '34.195.105.136',
-    '34.237.3.244',
-    '35.155.119.135',
-    '52.11.166.252',
-    '34.212.5.7'
-  ]
-};
-
-
-
 // Route to get payment page information
 router.get('/checkout-info', auth, async (req, res) => {
   try {
@@ -151,7 +129,8 @@ router.post('/webhook', async (req, res) => {
             case EventName.TransactionPaid:
               console.log(`Transaction ${eventData.data.id} was paid`);
               try {
-                await sendWelcomeEmail(eventData.data.customer_email);
+                console.log('Sending welcome email to:', eventData.data?.items[0]?.custom_data?.email || eventData.data?.customer_email);
+                await sendWelcomeEmail(eventData.data?.items[0]?.custom_data?.email || eventData.data?.customer_email);
               } catch (error) {
                 console.error('Error sending welcome email:', error);
                 // Don't fail the webhook for email errors
@@ -162,7 +141,7 @@ router.post('/webhook', async (req, res) => {
               case EventName.SubscriptionCanceled:
               console.log('\n===== PROCESSING SUBSCRIPTION CANCELLED =====');
               try {
-                const customerEmail = eventData.data?.customer?.email || eventData.data?.customer_email;
+                const customerEmail = eventData.data?.items[0]?.custom_data?.email || eventData.data?.customer_email;
                 console.log('Customer Email from webhook:', customerEmail);
                 console.log('Webhook Customer Data:', JSON.stringify(eventData.data?.customer, null, 2));
                 
