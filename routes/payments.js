@@ -371,8 +371,13 @@ router.post('/webhook', async (req, res) => {
               }
               break;
 
+
             case EventName.ProductUpdated:
               console.log(`Product ${eventData.data.id} was updated`);
+              break;
+            
+            case EventName.SubscriptionActivated:
+              console.log(`Subscription ${eventData.data.id} was activated`);
               break;
 
             case EventName.SubscriptionUpdated:
