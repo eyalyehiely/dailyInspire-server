@@ -115,12 +115,15 @@ router.get('/checkout-info', auth, async (req, res) => {
 
 // Webhook endpoint for Paddle to handle all subscription events
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  let signature;
+  let rawRequestBody;
+  
   try {
     console.log('===== WEBHOOK RECEIVED =====');
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
     
-    const signature = (req.headers['paddle-signature'] || '');
-    const rawRequestBody = req.body.toString();
+    signature = (req.headers['paddle-signature'] || '');
+    rawRequestBody = req.body.toString();
     const secretKey = process.env['WEBHOOK_SECRET_KEY'] || '';
 
     if (!signature || !rawRequestBody) {
