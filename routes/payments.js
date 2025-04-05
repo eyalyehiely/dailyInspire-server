@@ -164,13 +164,18 @@ router.get('/checkout-info', auth, async (req, res) => {
 
 // Create a `POST` endpoint to accept webhooks sent by Paddle.
 router.post('/webhooks', 
-  // Configure raw body parser specifically for this route
-  express.raw({ 
-    type: 'application/json',
-    verify: (req, res, buf) => {
-      req.rawBody = buf;
-    }
-  }),
+  // First, handle raw body
+  (req, res, next) => {
+    let data = '';
+    req.on('data', chunk => {
+      data += chunk;
+    });
+    req.on('end', () => {
+      req.rawBody = data;
+      next();
+    });
+  },
+  // Then verify IP
   verifyPaddleIP,
   async (req, res) => {
     console.log('\n===== NEW WEBHOOK RECEIVED =====');
@@ -185,19 +190,8 @@ router.post('/webhooks',
         return res.status(400).json({ error: 'Missing Paddle-Signature header' });
       }
 
-      // Get the raw request body from the verified buffer
-      const rawBody = req.rawBody;
-      if (!Buffer.isBuffer(rawBody)) {
-        console.error('❌ Request body is not a Buffer:', {
-          bodyType: typeof req.body,
-          rawBodyType: typeof rawBody,
-          body: req.body
-        });
-        return res.status(400).json({ error: 'Invalid request body format' });
-      }
-
-      // Convert the raw body to a string for verification
-      const rawRequestBody = rawBody.toString('utf8');
+      // Get the raw request body
+      const rawRequestBody = req.rawBody;
       if (!rawRequestBody) {
         console.error('❌ Empty request body');
         return res.status(400).json({ error: 'Empty request body' });
@@ -214,7 +208,7 @@ router.post('/webhooks',
       console.log('Webhook Verification Details:', {
         signature,
         secretKey: secretKey ? 'Present' : 'Missing',
-        bodyLength: rawBody.length,
+        bodyLength: rawRequestBody.length,
         bodyPreview: rawRequestBody.substring(0, 100) + '...',
         headers: {
           'paddle-signature': signature,
