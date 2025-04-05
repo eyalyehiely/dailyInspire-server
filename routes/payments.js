@@ -147,6 +147,16 @@ router.post('/webhook', async (req, res) => {
             case EventName.SubscriptionActivated:
               console.log(`Subscription ${eventData.data.id} was activated`);
               break;
+
+            case EventName.TransactionPaid:
+              console.log(`Transaction ${eventData.data.id} was paid`);
+              try {
+                await sendWelcomeEmail(eventData.data.customer_email);
+              } catch (error) {
+                console.error('Error sending welcome email:', error);
+                // Don't fail the webhook for email errors
+              }
+              break;
             case EventName.SubscriptionCanceled:
               console.log(`Subscription ${eventData.data.id} was cancelled`);
               break;

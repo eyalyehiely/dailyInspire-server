@@ -1,9 +1,9 @@
 const nodemailer = require('nodemailer');
 
 // Function to send welcome email after signup
-const sendWelcomeEmail = async (user) => {
+const sendWelcomeEmail = async (userEmail) => {
   try {
-    console.log('Preparing to send welcome email to:', user.email);
+    console.log('Preparing to send welcome email to:', userEmail);
     console.log('Email configuration:', {
       service: process.env.EMAIL_SERVICE || 'gmail',
       user: process.env.EMAIL_USER ? 'Set' : 'Not set',
@@ -56,11 +56,11 @@ const sendWelcomeEmail = async (user) => {
 
     const mailOptions = {
       from: process.env.EMAIL_FROM || `Daily Inspirational Quotes <${process.env.EMAIL_USER}>`,
-      to: user.email,
+      to: userEmail,
       subject: emailSubject,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-          <h2>Welcome to Daily Inspirational Quotes, ${user.first_name}!</h2>
+          <h2>Welcome to Daily Inspirational Quotes, ${userEmail}!</h2>
           
           <p>Thank you for signing up for our daily quote service. Your account has been successfully created!</p>
           
