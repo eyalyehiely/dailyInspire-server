@@ -4,18 +4,12 @@ const auth = require('../middleware/auth');
 const User = require('../models/User');
 const { Paddle, EventName } = require('@paddle/paddle-node-sdk');
 const { 
-  sendReceiptEmail, 
   processSuccessfulPayment,
-  generateCheckoutUrl,
-  verifySubscriptionStatus,
   paddleApi,
-  generateClientToken
 } = require('../controllers/paddle-controller');
 const { sendWelcomeEmail } = require('../controllers/user-controller');
 const subscriptionService = require('../services/subscriptionService');
 const mongoose = require('mongoose');
-import { Paddle, EventName } from '@paddle/paddle-node-sdk'
-
 
 // Initialize Paddle SDK
 const paddle = new Paddle(process.env.PADDLE_API_KEY);
