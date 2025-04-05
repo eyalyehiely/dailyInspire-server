@@ -1,9 +1,25 @@
 const nodemailer = require('nodemailer');
+const User = require('../models/User');
 
 // Function to send welcome email after signup
 const sendWelcomeEmail = async (userEmail) => {
   try {
     console.log('Preparing to send welcome email to:', userEmail);
+    
+    // First, find the user by email to get all user data
+    const user = await User.findOne({ email: userEmail });
+    if (!user) {
+      console.error('User not found for email:', userEmail);
+      return;
+    }
+
+    console.log('Found user:', {
+      email: user.email,
+      timezone: user.timezone,
+      preferredTime: user.preferredTime,
+      isPay: user.isPay
+    });
+
     console.log('Email configuration:', {
       service: process.env.EMAIL_SERVICE || 'gmail',
       user: process.env.EMAIL_USER ? 'Set' : 'Not set',
@@ -56,11 +72,11 @@ const sendWelcomeEmail = async (userEmail) => {
 
     const mailOptions = {
       from: process.env.EMAIL_FROM || `Daily Inspirational Quotes <${process.env.EMAIL_USER}>`,
-      to: userEmail,
+      to: user.email,
       subject: emailSubject,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
-          <h2>Welcome to Daily Inspirational Quotes, ${userEmail}!</h2>
+          <h2>Welcome to Daily Inspirational Quotes, ${user.first_name || user.email}!</h2>
           
           <p>Thank you for signing up for our daily quote service. Your account has been successfully created!</p>
           
@@ -195,10 +211,6 @@ const sendPaymentFailedEmail = async (user) => {
     // Don't throw - we don't want to break the signup process if email fails
   }
 };
-
-
-
-
 
 // Export the functions
 module.exports = {
