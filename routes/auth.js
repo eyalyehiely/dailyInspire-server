@@ -198,7 +198,7 @@ router.get('/preferences', auth, async (req, res) => {
     
     // Check if the user has an active or valid subscription
     // Valid subscription statuses are 'active' or 'cancelled' (during grace period)
-    if (!user.isPay || (user.subscriptionStatus !== 'active' && user.subscriptionStatus !== 'cancelled')) {
+    if (!user.isPay || !user.quotesEnabled) {
       return res.status(403).json({ 
         message: 'Subscription required to access preferences',
         status: user.subscriptionStatus,
