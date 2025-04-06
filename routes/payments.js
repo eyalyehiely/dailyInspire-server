@@ -176,6 +176,10 @@ router.post('/webhook', async (req, res) => {
 
                 user.cardBrand = paymentMethod.card.type;
                 user.cardLastFour = paymentMethod.card.last4;
+                user.quotesEnabled = true;
+                user.isPay = true;
+                user.subscriptionStatus = 'active';
+                
                 await user.save();
                 console.log('✅ User card details updated successfully');
                 await sendPaymentMethodUpdatedEmail(userId);
