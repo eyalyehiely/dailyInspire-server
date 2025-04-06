@@ -759,4 +759,28 @@ router.get('/verify-transaction/:transactionId', auth, async (req, res) => {
   }
 });
 
+// Route to get subscription management URL
+router.get('/subscription-management-url', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || !user.subscriptionId) {
+      return res.status(404).json({ 
+        message: 'Subscription not found',
+        error: 'No active subscription found'
+      });
+    }
+
+    const response = await paddleApi.get(`/subscriptions/${user.subscriptionId}`);
+    const managementUrl = response.data.data.management_urls.update_payment_method;
+    
+    return res.json({ managementUrl });
+  } catch (error) {
+    console.error('Error getting subscription management URL:', error);
+    return res.status(500).json({ 
+      message: 'Failed to get management URL',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
