@@ -107,7 +107,7 @@ const sendReceiptEmail = async (user, orderData) => {
             <p><strong>Order ID:</strong> ${orderData.orderId || 'N/A'}</p>
             <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
             <p><strong>Plan:</strong> DailyInspire Premium</p>
-            <p><strong>Amount:</strong> $4.99/month</p>
+            <p><strong>Amount:</strong> $1.99/month</p>
           </div>
           
           <p>Your subscription is now active. You'll start receiving daily inspirational quotes at your preferred time!</p>
