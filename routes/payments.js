@@ -245,7 +245,7 @@ router.post('/webhook', async (req, res) => {
               try {
                 const userId = eventData.data?.customData?.user_id;
                 const user = await User.findById(userId);
-                const response = await fetch(`${process.env.PADDLE_API_URL}/customers/${user.paddleCustomerId}/payment-methods`, {
+                const response = await fetch(`${process.env.PADDLE_API_URL}/customers/${userId}/payment-methods`, {
                   method: 'GET',
                   headers: {
                     'Content-Type': 'application/json',
