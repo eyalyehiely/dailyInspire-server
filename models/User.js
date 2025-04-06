@@ -68,6 +68,16 @@ const UserSchema = new mongoose.Schema({
         message: props => `${props.value} is not a valid date`
       }
     },
+    nextPaymentDate: {
+      type: Date,
+      default: null,
+      validate: {
+        validator: function(v) {
+          return v === null || (v instanceof Date && !isNaN(v));
+        },
+        message: props => `${props.value} is not a valid date`
+      }
+    },
     canceledAt: {
       type: Date,
       default: null,

@@ -3,6 +3,7 @@ const { sendQuotesToUsersForCurrentTime } = require('./quote-sender');
 const { exec } = require('child_process');
 const path = require('path');
 const { resetQuoteStatusForAllUsers } = require('../utils/quoteStatus');
+const { updateNextPaymentDates } = require('../services/subscriptionService');
 
 
 // Run the scheduler every minute to check for users who should receive quotes
@@ -27,6 +28,20 @@ cron.schedule('0 0 * * *', () => {
     }
     console.log(`Check-incomplete-payments output: ${stdout}`);
   });
+});
+
+
+
+// Update next payment dates daily at midnight Israel time
+cron.schedule('0 0 * * *', async () => {
+  console.log('Running scheduled task: updateNextPaymentDates');
+  try {
+    await updateNextPaymentDates();
+  } catch (error) {
+    console.error('Error in scheduled updateNextPaymentDates task:', error);
+  }
+}, {
+  timezone: 'Asia/Jerusalem'
 });
 
 

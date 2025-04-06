@@ -379,6 +379,7 @@ router.post('/signup', async (req, res) => {
       lastCheckoutAttempt: {
         url: null,
         firstPaymentDate: null,
+        nextPaymentDate: null,
         timestamp: null
       }
     });
