@@ -121,6 +121,7 @@ router.post('/webhook', async (req, res) => {
         if (signature && rawRequestBody) {
           // The `unmarshal` function will validate the integrity of the webhook and return an entity
           const eventData = await paddle.webhooks.unmarshal(rawRequestBody, secretKey, signature);
+          const userId = eventData.data?.customData?.user_id;
           console.log('Event Data:', JSON.stringify(eventData, null, 2));
 
           switch (eventData.eventType) {
@@ -133,8 +134,8 @@ router.post('/webhook', async (req, res) => {
               console.log(`Transaction ${eventData.data.id} was paid`);
               try {
 
-                console.log('Sending welcome email to:', eventData.data?.customData?.user_id);
-                await sendWelcomeEmail(eventData.data?.customData?.user_id);
+                console.log('Sending welcome email to:', userId);
+                await sendWelcomeEmail(userId);
               } catch (error) {
                 console.error('Error sending welcome email:', error);
                 // Don't fail the webhook for email errors
@@ -142,12 +143,11 @@ router.post('/webhook', async (req, res) => {
               }
               break;
 
-      // Cancel subscription
+            // Cancel subscription
             case EventName.SubscriptionCanceled:
               console.log(`Subscription ${eventData.data.id} was cancelled`);
               console.log('\n===== PROCESSING SUBSCRIPTION CANCELLED =====');
               try {
-                const userId = eventData.data?.customData?.user_id;
                 console.log('Customer ID from webhook:', userId);
                 console.log('Webhook Customer Data:', JSON.stringify(eventData.data?.customer, null, 2));
                 
@@ -170,22 +170,39 @@ router.post('/webhook', async (req, res) => {
                   return res.status(404).json({ error: 'User not found' });
                 }
 
-                const updateData = {
-                  subscriptionStatus: 'canceled',
-                  isPay: false,
-                  quotesEnabled: false,
-                  paymentUpdatedAt: new Date(),
-                  canceledAt: new Date()
-                };
-                console.log('Updating user with data:', updateData);
+                // Get subscription details to check billing period end
+                const subscriptionResponse = await paddleApi.get(`/subscriptions/${eventData.data.id}`);
+                const subscriptionData = subscriptionResponse.data;
+                const billingPeriodEnd = new Date(subscriptionData.current_billing_period.ends_at);
+                const now = new Date();
 
-                const updatedUser = await User.findByIdAndUpdate(user._id, updateData, { new: true });
-                console.log('✅ User updated successfully');
-                console.log('Updated User Status:', {
-                  isPay: updatedUser.isPay,
-                  subscriptionStatus: updatedUser.subscriptionStatus,
-                  email: updatedUser.email
-                });
+                // Only update user status if we're past the billing period end
+                if (now >= billingPeriodEnd) {
+                  const updateData = {
+                    subscriptionStatus: 'canceled',
+                    isPay: false,
+                    quotesEnabled: false,
+                    paymentUpdatedAt: new Date(),
+                    canceledAt: new Date()
+                  };
+                  console.log('Updating user with data:', updateData);
+
+                  const updatedUser = await User.findByIdAndUpdate(user._id, updateData, { new: true });
+                  console.log('✅ User updated successfully');
+                  console.log('Updated User Status:', {
+                    isPay: updatedUser.isPay,
+                    subscriptionStatus: updatedUser.subscriptionStatus,
+                    email: updatedUser.email
+                  });
+                } else {
+                  console.log('Subscription cancelled but maintaining access until end of billing period:', billingPeriodEnd);
+                  // Update only the subscription status, keeping access active
+                  const updateData = {
+                    subscriptionStatus: 'canceled',
+                    canceledAt: new Date()
+                  };
+                  await User.findByIdAndUpdate(user._id, updateData);
+                }
 
                 await cancelSubscriptionEmail(userId);
 
@@ -193,9 +210,10 @@ router.post('/webhook', async (req, res) => {
                   success: true, 
                   message: 'Subscription cancelled successfully',
                   user: {
-                    id: updatedUser._id,
-                    email: updatedUser.email,
-                    subscriptionStatus: updatedUser.subscriptionStatus
+                    id: user._id,
+                    email: user.email,
+                    subscriptionStatus: user.subscriptionStatus,
+                    accessEndsAt: billingPeriodEnd
                   }
                 });
               } catch (error) {

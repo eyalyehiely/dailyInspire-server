@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const User = require('../models/User');
+const paddleApi = require('../services/paddleApi');
 
 // Function to send welcome email after signup
 const sendWelcomeEmail = async (user_id) => {
@@ -250,6 +251,16 @@ const cancelSubscriptionEmail = async (user_id) => {
       return;
     }
 
+    // Get subscription details to get the end date
+    const subscriptionResponse = await paddleApi.get(`/subscriptions/${user.subscriptionId}`);
+    const subscriptionData = subscriptionResponse.data;
+    const billingPeriodEnd = new Date(subscriptionData.current_billing_period.ends_at);
+    const formattedEndDate = billingPeriodEnd.toLocaleDateString('he-IL', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+
     const transporter = nodemailer.createTransport({
       service: process.env.EMAIL_SERVICE || 'gmail',
       auth: {
@@ -265,7 +276,9 @@ const cancelSubscriptionEmail = async (user_id) => {
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
           <h2>Subscription Canceled</h2>
-          <p>We regret to inform you that your subscription has been canceled. You will no longer receive daily inspirational quotes.</p>
+          <p>We regret to inform you that your subscription has been canceled.</p>
+          <p>You will continue to have access to all premium features until ${formattedEndDate}.</p>
+          <p>After this date, you will no longer receive daily inspirational quotes.</p>
           <p>If you have any questions or need assistance, please contact our support team.</p>
           <p>Thank you for your understanding.</p>
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
