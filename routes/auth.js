@@ -142,6 +142,32 @@ router.post('/delete-account', auth, async (req, res) => {
 
     // First cancel the subscription if it exists
     if (user.subscriptionId) {
+      // First get the current subscription details to maintain items
+      const getResponse = await fetch(`${process.env.PADDLE_API_URL}/subscriptions/${user.subscriptionId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.PADDLE_API_KEY}`
+        }
+      });
+
+      const subscriptionData = await getResponse.json();
+      
+      if (!getResponse.ok) {
+        console.error('Failed to fetch subscription:', subscriptionData);
+        return res.status(500).json({
+          message: 'Failed to fetch subscription details. Please try again later.',
+          error: subscriptionData.error ? subscriptionData.error.message : 'Unknown error occurred'
+        });
+      }
+
+      // Prepare items array from current subscription
+      const items = subscriptionData.data.items.map(item => ({
+        price_id: item.price.id,
+        quantity: item.quantity
+      }));
+
+      // Update subscription with cancellation
       const response = await fetch(`${process.env.PADDLE_API_URL}/subscriptions/${user.subscriptionId}`, {
         method: 'PATCH',
         headers: {
@@ -150,8 +176,7 @@ router.post('/delete-account', auth, async (req, res) => {
         },
         body: JSON.stringify({
           status: 'canceled',
-          effective_from: 'immediately',
-          prorate: false,
+          items: items,
           proration_billing_mode: 'prorated_immediately'
         })
       });
