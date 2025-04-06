@@ -151,7 +151,8 @@ router.post('/delete-account', auth, async (req, res) => {
         body: JSON.stringify({
           status: 'canceled',
           effective_from: 'immediately',
-          prorate: false
+          prorate: false,
+          proration_billing_mode: 'prorated_immediately'
         })
       });
 
