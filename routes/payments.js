@@ -245,8 +245,18 @@ router.post('/webhook', async (req, res) => {
               try {
                 const userId = eventData.data?.customData?.user_id;
                 const user = await User.findById(userId);
-                user.cardBrand = eventData.data?.payment_information?.card_brand;
-                user.cardLastFour = eventData.data?.payment_information?.last_four;
+                const response = await fetch(`${process.env.PADDLE_API_URL}/customers/${user.paddleCustomerId}/payment-methods`, {
+                  method: 'GET',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.PADDLE_API_KEY}`
+                  }
+                })
+                const paymentMethods = await response.data.data;
+                const customerCardType = paymentMethods.card_type.type;
+                const customerCardLastFour = paymentMethods.card.last4;
+                user.cardBrand = customerCardType;
+                user.cardLastFour = customerCardLastFour;
                 await user.save();
                 console.log('✅ User card details updated successfully');
               } catch (error) {
