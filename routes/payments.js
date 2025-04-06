@@ -240,7 +240,7 @@ router.post('/webhook', async (req, res) => {
                 return res.status(500).json({ error: 'Failed to process transaction payment failure' });
               }
               break;
-            case EventName.SubscriptionPaymentMethodUpdated:
+            case EventName.PaymentMethodSaved:
               console.log(`Subscription ${eventData.data.id} payment method updated`);
               try {
                 const userId = eventData.data?.customData?.user_id;
