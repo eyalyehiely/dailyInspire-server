@@ -122,6 +122,7 @@ router.post('/webhook', async (req, res) => {
           // The `unmarshal` function will validate the integrity of the webhook and return an entity
           const eventData = await paddle.webhooks.unmarshal(rawRequestBody, secretKey, signature);
           const userId = eventData.data?.customData?.user_id;
+          console.log('User ID:', userId);
           console.log('Event Data:', JSON.stringify(eventData, null, 2));
 
           switch (eventData.eventType) {
@@ -147,10 +148,10 @@ router.post('/webhook', async (req, res) => {
                 const userId = eventData.data?.customData?.user_id;
                 const user = await User.findById(userId);
                 const customerId = eventData.data?.customerId;
-                if (!user) {
-                  console.error('❌ User not found for ID:', userId);
-                  return res.status(404).json({ error: 'User not found' });
-                }
+                // if (!user) {
+                //   console.error('❌ User not found for ID:', userId);
+                //   return res.status(404).json({ error: 'User not found' });
+                // }
 
                 const response = await fetch(`${process.env.PADDLE_API_URL}/customers/${customerId}/payment-methods`, {
                   method: 'GET',
