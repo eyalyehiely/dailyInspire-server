@@ -170,14 +170,17 @@ router.post('/webhook', async (req, res) => {
                   return res.status(404).json({ error: 'User not found' });
                 }
 
-                // Get subscription details to check billing period end
-                const subscriptionResponse = await paddleApi.get(`/subscriptions/${eventData.data.id}`);
-                const subscriptionData = subscriptionResponse.data;
-                const billingPeriodEnd = new Date(subscriptionData.current_billing_period.ends_at);
+                // Get subscription details from the webhook payload
+                const subscriptionData = eventData.data;
+                const billingPeriodEnd = new Date(subscriptionData?.currentBillingPeriod?.endsAt);
                 const now = new Date();
 
-                // Only update user status if we're past the billing period end
-                if (now >= billingPeriodEnd) {
+                // Check if this is an immediate cancellation or end-of-billing-period cancellation
+                const isImmediateCancellation = subscriptionData.scheduled_change === null;
+                console.log('Cancellation type:', isImmediateCancellation ? 'Immediate' : 'End of billing period');
+
+                if (isImmediateCancellation) {
+                  // Immediate cancellation - revoke access now
                   const updateData = {
                     subscriptionStatus: 'canceled',
                     isPay: false,
@@ -185,25 +188,29 @@ router.post('/webhook', async (req, res) => {
                     paymentUpdatedAt: new Date(),
                     canceledAt: new Date()
                   };
-                  console.log('Updating user with data:', updateData);
+                  console.log('Updating user with data for immediate cancellation:', updateData);
 
                   const updatedUser = await User.findByIdAndUpdate(user._id, updateData, { new: true });
-                  console.log('✅ User updated successfully');
+                  console.log('✅ User updated successfully for immediate cancellation');
                   console.log('Updated User Status:', {
                     isPay: updatedUser.isPay,
                     subscriptionStatus: updatedUser.subscriptionStatus,
                     email: updatedUser.email
                   });
                 } else {
+                  // End of billing period cancellation - maintain access until the end date
                   console.log('Subscription cancelled but maintaining access until end of billing period:', billingPeriodEnd);
-                  // Update only the subscription status, keeping access active
                   const updateData = {
                     subscriptionStatus: 'canceled',
-                    canceledAt: new Date()
+                    canceledAt: new Date(),
+                    // Keep isPay and quotesEnabled as true until the billing period ends
+                    isPay: true,
+                    quotesEnabled: true
                   };
                   await User.findByIdAndUpdate(user._id, updateData);
                 }
 
+                // Send cancellation email with the appropriate end date
                 await cancelSubscriptionEmail(userId);
 
                 return res.status(200).json({ 
@@ -213,7 +220,8 @@ router.post('/webhook', async (req, res) => {
                     id: user._id,
                     email: user.email,
                     subscriptionStatus: user.subscriptionStatus,
-                    accessEndsAt: billingPeriodEnd
+                    accessEndsAt: billingPeriodEnd,
+                    isImmediateCancellation
                   }
                 });
               } catch (error) {
