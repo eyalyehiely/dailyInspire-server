@@ -3,6 +3,7 @@ const axios = require('axios');
 const nodemailer = require('nodemailer');
 const User = require('../models/User');
 const { DateTime } = require('luxon'); // We'll need to add this dependency
+const { isQuoteSentToday, updateQuoteStatus } = require('../utils/quoteStatus');
 
 // Function to get a quote from the API
 async function fetchDailyQuote() {
@@ -151,9 +152,21 @@ async function sendQuotesToUsersForCurrentTime() {
       const quote = await fetchDailyQuote();
       
       // Send the quote to each user
-      const sendPromises = usersToReceiveQuotes.map(user => 
-        sendQuoteEmail(user.email, quote)
-      );
+      const sendPromises = usersToReceiveQuotes.map(async user => {
+        // Check if quote was already sent today
+        const wasSentToday = await isQuoteSentToday(user._id);
+        if (wasSentToday) {
+          console.log(`Skipping quote send for ${user.email} - already sent today`);
+          return;
+        }
+        
+        // Send the quote
+        await sendQuoteEmail(user.email, quote);
+        
+        // Update the quote status
+        await updateQuoteStatus(user._id, true);
+        console.log(`Quote sent to ${user.email} and status updated`);
+      });
       
       await Promise.all(sendPromises);
       console.log(`Sent quotes to ${usersToReceiveQuotes.length} users.`);

@@ -39,6 +39,24 @@ cron.schedule('0 0 * * *', () => {
   });
 });
 
+
+
+const cron = require('node-cron');
+const { resetQuoteStatusForAllUsers } = require('../utils/quoteStatus');
+
+// Schedule the reset to run at midnight in each timezone
+// This will run every hour and check if it's midnight in any timezone
+cron.schedule('0 * * * *', async () => {
+  try {
+    console.log('Running midnight reset check...');
+    await resetQuoteStatusForAllUsers();
+    console.log('Midnight reset completed successfully');
+  } catch (error) {
+    console.error('Error in midnight reset:', error);
+  }
+});
+
+
 console.log('Quote scheduler started. Will check every minute for users to send quotes to...');
 console.log('Payment check scheduler started. Will run daily at midnight');
 
@@ -46,5 +64,6 @@ console.log('Payment check scheduler started. Will run daily at midnight');
 module.exports = {
   startScheduler: () => {
     console.log('Scheduler initialized for quotes and payment checks');
+    console.log('Scheduled jobs started');
   }
 };

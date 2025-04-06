@@ -101,6 +101,9 @@ const sendWelcomeEmail = async (user_id) => {
             <p style="color: #666; font-size: 14px;">If you ever want to update your preferences or unsubscribe, you can do so by logging into your account or clicking the unsubscribe link in any of our emails.</p>
             ${isSubscriptionWelcome ? `<p style="color: #666; font-size: 14px;">To manage your subscription, visit our <a href="${customerPortalLink}">customer portal</a>.</p>` : ''}
           </div>
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+            <p style="color: #666; font-size: 14px;">This is an automated notification from DailyInspire.</p>
+          </div>
         </div>
       `
     };
@@ -159,10 +162,6 @@ const sendEmailToOwner = async (user) => {
             <p><strong>Daily Quote Time:</strong> ${formattedTime}</p>
             <p><strong>Timezone:</strong> ${user.timezone || 'UTC'}</p>
             <p><strong>Signup Date:</strong> ${new Date().toLocaleString()}</p>
-          </div>
-          
-          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-            <p style="color: #666; font-size: 14px;">This is an automated notification from your Daily Inspirational Quotes application.</p>
           </div>
         </div>
       `
@@ -225,10 +224,6 @@ const sendPaymentFailedEmail = async (user_id) => {
             <p><strong>Email:</strong> ${user.email}</p>
             <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
           </div>
-          
-          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-            <p style="color: #666; font-size: 14px;">This is an automated notification from your Daily Inspirational Quotes application.</p>
-          </div>
         </div>
       `
     };
@@ -273,6 +268,9 @@ const cancelSubscriptionEmail = async (user_id) => {
           <p>We regret to inform you that your subscription has been canceled. You will no longer receive daily inspirational quotes.</p>
           <p>If you have any questions or need assistance, please contact our support team.</p>
           <p>Thank you for your understanding.</p>
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+            <p style="color: #666; font-size: 14px;">This is an automated notification from DailyInspire.</p>
+          </div>
         </div>
       `
     };

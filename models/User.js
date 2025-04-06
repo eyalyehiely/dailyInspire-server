@@ -132,6 +132,14 @@ const UserSchema = new mongoose.Schema({
   },
   resetPasswordExpires: {
     type: Date
+  },
+  isQuoteSentToday: {
+    type: Boolean,
+    default: false
+  },
+  lastQuoteSentAt: {
+    type: Date,
+    default: null
   }
 });
 
