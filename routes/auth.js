@@ -149,7 +149,9 @@ router.post('/delete-account', auth, async (req, res) => {
           'Authorization': `Bearer ${process.env.PADDLE_API_KEY}`
         },
         body: JSON.stringify({
-          status: 'canceled'
+          status: 'canceled',
+          effective_from: 'immediately',
+          prorate: false
         })
       });
 
