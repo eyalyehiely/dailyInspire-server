@@ -145,9 +145,9 @@ router.post('/webhook', async (req, res) => {
               console.log(`Payment method saved for user: ${userId}`);
               console.log(`Subscription ${eventData.data.id} payment method updated`);
               try {
-                const userId = eventData.data?.customData?.user_id;
+
                 const user = await User.findById(userId);
-                const customerId = eventData.data?.customerId;
+
                 // if (!user) {
                 //   console.error('❌ User not found for ID:', userId);
                 //   return res.status(404).json({ error: 'User not found' });
