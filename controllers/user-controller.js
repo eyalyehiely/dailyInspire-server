@@ -249,7 +249,7 @@ const cancelSubscriptionEmail = async (user_id) => {
     // Get subscription details to get the end date
     const subscriptionResponse = await paddleApi.get(`/subscriptions/${user.subscriptionId}`);
     const subscriptionData = subscriptionResponse.data;
-    const billingPeriodEnd = new Date(subscriptionData.current_billing_period.ends_at);
+    const billingPeriodEnd = new Date(subscriptionData.current_billing_period.endsAt);
     const formattedEndDate = billingPeriodEnd.toLocaleDateString('he-IL', { 
       year: 'numeric', 
       month: 'long', 
