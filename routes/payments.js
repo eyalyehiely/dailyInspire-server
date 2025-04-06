@@ -172,7 +172,7 @@ router.post('/webhook', async (req, res) => {
 
                 // Get subscription details from the webhook payload
                 const subscriptionData = eventData.data;
-                const billingPeriodEnd = new Date(subscriptionData?.currentBillingPeriod?.endsAt || subscriptionData?.nextBilledAt);
+                const billingPeriodEnd = user.nextPaymentDate;
                 
                 if (isNaN(billingPeriodEnd.getTime())) {
                   console.error('Invalid billing period end date:', subscriptionData?.current_billing_period);
