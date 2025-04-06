@@ -245,23 +245,41 @@ router.post('/webhook', async (req, res) => {
               try {
                 const userId = eventData.data?.customData?.user_id;
                 const user = await User.findById(userId);
+                if (!user) {
+                  console.error('❌ User not found for ID:', userId);
+                  return res.status(404).json({ error: 'User not found' });
+                }
+
                 const response = await fetch(`${process.env.PADDLE_API_URL}/customers/${userId}/payment-methods`, {
                   method: 'GET',
                   headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${process.env.PADDLE_API_KEY}`
                   }
-                })
-                const paymentMethods = await response.data.data;
-                const customerCardType = paymentMethods.card_type.type;
-                const customerCardLastFour = paymentMethods.card.last4;
-                user.cardBrand = customerCardType;
-                user.cardLastFour = customerCardLastFour;
+                });
+
+                if (!response.ok) {
+                  throw new Error(`Paddle API error: ${response.status} ${response.statusText}`);
+                }
+
+                const responseData = await response.json();
+                console.log('Paddle API response:', JSON.stringify(responseData, null, 2));
+
+                // Get the first payment method (usually the most recent)
+                const paymentMethod = responseData.data[0];
+                if (!paymentMethod || !paymentMethod.card) {
+                  throw new Error('No card payment method found');
+                }
+
+                user.cardBrand = paymentMethod.card.type;
+                user.cardLastFour = paymentMethod.card.last4;
                 await user.save();
                 console.log('✅ User card details updated successfully');
+                return res.status(200).json({ success: true });
               } catch (error) {
                 console.error('❌ Error processing payment method update:', error);
                 console.error('Error stack:', error.stack);
+                return res.status(500).json({ error: 'Failed to process payment method update' });
               }
               break;
             default:
