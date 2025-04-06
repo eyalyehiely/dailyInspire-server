@@ -197,11 +197,10 @@ router.get('/preferences', auth, async (req, res) => {
     }
     
     // Check if the user has an active or valid subscription
-    // Valid subscription statuses are 'active' or 'cancelled' (during grace period)
+    // Valid if isPay is true and quotesEnabled is true
     if (!user.isPay || !user.quotesEnabled) {
       return res.status(403).json({ 
         message: 'Subscription required to access preferences',
-        status: user.subscriptionStatus,
         code: 'subscription_required'
       });
     }
@@ -219,7 +218,8 @@ router.get('/preferences', auth, async (req, res) => {
         timezone: user.timezone,
         quotesEnabled: user.quotesEnabled,
         cardBrand: user.cardBrand,
-        cardLastFour: user.cardLastFour
+        cardLastFour: user.cardLastFour,
+        subscriptionStatus: user.subscriptionStatus
       }
     });
   } catch (error) {
