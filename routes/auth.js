@@ -142,7 +142,7 @@ router.post('/delete-account', auth, async (req, res) => {
 
     // First cancel the subscription if it exists
     if (user.subscriptionId) {
-      const response = await fetch(`https://api.paddle.com/subscriptions/${user.subscriptionId}`, {
+      const response = await fetch(`${process.env.PADDLE_API_URL}/subscriptions/${user.subscriptionId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -155,9 +155,18 @@ router.post('/delete-account', auth, async (req, res) => {
 
       const data = await response.json();
       
-      if (!response.ok || data.status !== 'canceled') {
+      if (!response.ok) {
+        console.error('Paddle API Error:', data);
         return res.status(500).json({
-          message: 'Failed to cancel subscription. Please try again later.'
+          message: 'Failed to cancel subscription. Please contact support if the issue persists.',
+          error: data.error ? data.error.message : 'Unknown error occurred'
+        });
+      }
+
+      if (data.status !== 'canceled') {
+        return res.status(500).json({
+          message: 'Subscription cancellation failed. Please try again or contact support.',
+          status: data.status
         });
       }
     }
