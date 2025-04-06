@@ -555,7 +555,7 @@ router.post('/admin/force-upgrade', async (req, res) => {
 // Route to update user payment data
 router.post('/update-user-data', auth, async (req, res) => {
   try {
-    const { subscriptionId, subscriptionStatus, cardBrand, cardLastFour, firstPaymentDate, nextPaymentDate } = req.body;
+    const { subscriptionId, subscriptionStatus, cardBrand, cardLastFour, firstPaymentDate } = req.body;
     
     console.log('Received update-user-data request with card details:', {
       cardBrand,
@@ -576,10 +576,6 @@ router.post('/update-user-data', auth, async (req, res) => {
     const now = new Date();
     const israelTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
     
-    // Calculate next payment date (same date next month)
-    const calculatedNextPaymentDate = new Date(israelTime);
-    calculatedNextPaymentDate.setMonth(calculatedNextPaymentDate.getMonth() + 1);
-    
     // Update user's subscription data
     const updateData = {
       subscriptionId: formattedSubscriptionId,
@@ -591,7 +587,6 @@ router.post('/update-user-data', auth, async (req, res) => {
       cardBrand: cardBrand,
       cardLastFour: cardLastFour,
       'lastCheckoutAttempt.firstPaymentDate': firstPaymentDate || israelTime,
-      'lastCheckoutAttempt.nextPaymentDate': nextPaymentDate || calculatedNextPaymentDate,
       'lastCheckoutAttempt.timestamp': new Date()
     };
     
@@ -624,7 +619,7 @@ router.post('/update-user-data', auth, async (req, res) => {
         cardBrand: user.cardBrand,
         cardLastFour: user.cardLastFour,
         firstPaymentDate: user.lastCheckoutAttempt?.firstPaymentDate,
-        nextPaymentDate: user.lastCheckoutAttempt?.nextPaymentDate
+
       }
     });
   } catch (error) {

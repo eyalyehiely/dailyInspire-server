@@ -172,7 +172,6 @@ router.post('/delete-account', auth, async (req, res) => {
     }
     
     // After successful subscription cancellation, delete the user account
-    await cancelSubscriptionEmail(req.user.id);
     await User.findByIdAndDelete(req.user.id);
     
     
@@ -380,7 +379,6 @@ router.post('/signup', async (req, res) => {
       lastCheckoutAttempt: {
         url: null,
         firstPaymentDate: null,
-        nextPaymentDate: null,
         timestamp: null
       }
     });
