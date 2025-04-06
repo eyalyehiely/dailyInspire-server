@@ -97,11 +97,6 @@ const sendWelcomeEmail = async (user_id) => {
           </div>
           
           <p>We hope these daily quotes will bring inspiration and motivation to your day!</p>
-          
-          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-            <p style="color: #666; font-size: 14px;">If you ever want to update your preferences or unsubscribe, you can do so by logging into your account or clicking the unsubscribe link in any of our emails.</p>
-            ${isSubscriptionWelcome ? `<p style="color: #666; font-size: 14px;">To manage your subscription, visit our <a href="${customerPortalLink}">customer portal</a>.</p>` : ''}
-          </div>
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
             <p style="color: #666; font-size: 14px;">This is an automated notification from DailyInspire.</p>
           </div>
