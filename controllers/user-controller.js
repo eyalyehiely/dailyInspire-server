@@ -238,7 +238,7 @@ const sendPaymentFailedEmail = async (user_id) => {
 };
 
 
-const cancelSubscriptionEmail = async (user_id) => {
+const cancelSubscriptionEmail = async (user_id, billingPeriodEnd) => {
   try {
     const user = await User.findOne({ _id: user_id });
     if (!user) {
@@ -246,10 +246,11 @@ const cancelSubscriptionEmail = async (user_id) => {
       return;
     }
 
-    // Get subscription details to get the end date
-    const subscriptionResponse = await paddleApi.get(`/subscriptions/${user.subscriptionId}`);
-    const subscriptionData = subscriptionResponse.data;
-    const billingPeriodEnd = new Date(subscriptionData.current_billing_period.endsAt);
+    if (!billingPeriodEnd || isNaN(billingPeriodEnd.getTime())) {
+      console.error('Invalid billing period end date provided:', billingPeriodEnd);
+      return;
+    }
+
     const formattedEndDate = billingPeriodEnd.toLocaleDateString('he-IL', { 
       year: 'numeric', 
       month: 'long', 

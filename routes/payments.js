@@ -172,8 +172,12 @@ router.post('/webhook', async (req, res) => {
 
                 // Get subscription details from the webhook payload
                 const subscriptionData = eventData.data;
-                const billingPeriodEnd = new Date(subscriptionData?.currentBillingPeriod?.endsAt);
-                const now = new Date();
+                const billingPeriodEnd = new Date(subscriptionData?.currentBillingPeriod?.endsAt || subscriptionData?.nextBilledAt);
+                
+                if (isNaN(billingPeriodEnd.getTime())) {
+                  console.error('Invalid billing period end date:', subscriptionData?.current_billing_period);
+                  return res.status(400).json({ error: 'Invalid billing period end date' });
+                }
 
                 // Check if this is an immediate cancellation or end-of-billing-period cancellation
                 const isImmediateCancellation = subscriptionData.scheduled_change === null;
@@ -203,15 +207,16 @@ router.post('/webhook', async (req, res) => {
                   const updateData = {
                     subscriptionStatus: 'canceled',
                     canceledAt: new Date(),
+                    billingPeriodEnd,
                     // Keep isPay and quotesEnabled as true until the billing period ends
                     isPay: true,
                     quotesEnabled: true
                   };
                   await User.findByIdAndUpdate(user._id, updateData);
-                }
 
-                // Send cancellation email with the appropriate end date
-                await cancelSubscriptionEmail(userId);
+                  // Send cancellation email with the appropriate end date
+                  await cancelSubscriptionEmail(userId, billingPeriodEnd);
+                }
 
                 return res.status(200).json({ 
                   success: true, 
