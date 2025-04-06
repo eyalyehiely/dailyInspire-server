@@ -142,48 +142,20 @@ router.post('/delete-account', auth, async (req, res) => {
 
     // First cancel the subscription if it exists
     if (user.subscriptionId) {
-      // First get the current subscription details to maintain items
-      const getResponse = await fetch(`${process.env.PADDLE_API_URL}/subscriptions/${user.subscriptionId}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.PADDLE_API_KEY}`
-        }
-      });
-
-      const subscriptionData = await getResponse.json();
-      
-      if (!getResponse.ok) {
-        console.error('Failed to fetch subscription:', subscriptionData);
-        return res.status(500).json({
-          message: 'Failed to fetch subscription details. Please try again later.',
-          error: subscriptionData.error ? subscriptionData.error.message : 'Unknown error occurred'
-        });
-      }
-
-      // Prepare items array from current subscription
-      const items = subscriptionData.data.items.map(item => ({
-        price_id: item.price.id,
-        quantity: item.quantity
-      }));
-
-      // Update subscription with cancellation
-      const response = await fetch(`${process.env.PADDLE_API_URL}/subscriptions/${user.subscriptionId}`, {
-        method: 'PATCH',
+      const cancelResponse = await fetch(`${process.env.PADDLE_API_URL}/subscriptions/${user.subscriptionId}/cancel`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${process.env.PADDLE_API_KEY}`
         },
         body: JSON.stringify({
-          status: 'canceled',
-          items: items,
-          proration_billing_mode: 'prorated_immediately'
+          effective_from: 'immediately'
         })
       });
 
-      const data = await response.json();
+      const data = await cancelResponse.json();
       
-      if (!response.ok) {
+      if (!cancelResponse.ok) {
         console.error('Paddle API Error:', data);
         return res.status(500).json({
           message: 'Failed to cancel subscription. Please contact support if the issue persists.',
@@ -191,10 +163,10 @@ router.post('/delete-account', auth, async (req, res) => {
         });
       }
 
-      if (data.status !== 'canceled') {
+      if (!data.data || data.data.status !== 'canceled') {
         return res.status(500).json({
           message: 'Subscription cancellation failed. Please try again or contact support.',
-          status: data.status
+          status: data.data ? data.data.status : 'unknown'
         });
       }
     }
