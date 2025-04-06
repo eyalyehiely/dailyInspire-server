@@ -7,7 +7,7 @@ const {
   processSuccessfulPayment,
   paddleApi,
 } = require('../controllers/paddle-controller');
-const { sendWelcomeEmail, sendPaymentFailedEmail, cancelSubscriptionEmail } = require('../controllers/user-controller');
+const { sendWelcomeEmail, sendPaymentFailedEmail, cancelSubscriptionEmail, sendPaymentMethodUpdatedEmail } = require('../controllers/user-controller');
 const subscriptionService = require('../services/subscriptionService');
 const mongoose = require('mongoose');
 
@@ -276,6 +276,7 @@ router.post('/webhook', async (req, res) => {
                 user.cardLastFour = paymentMethod.card.last4;
                 await user.save();
                 console.log('✅ User card details updated successfully');
+                await sendPaymentMethodUpdatedEmail(userId);
                 return res.status(200).json({ success: true });
               } catch (error) {
                 console.error('❌ Error processing payment method update:', error);
