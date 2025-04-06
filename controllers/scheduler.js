@@ -3,6 +3,8 @@ const { sendQuotesToUsersForCurrentTime } = require('./quote-sender');
 const { updateNextPaymentDates } = require('../services/subscriptionService');
 const { exec } = require('child_process');
 const path = require('path');
+const { resetQuoteStatusForAllUsers } = require('../utils/quoteStatus');
+
 
 // Run the scheduler every minute to check for users who should receive quotes
 cron.schedule('* * * * *', async () => {
@@ -41,8 +43,6 @@ cron.schedule('0 0 * * *', () => {
 
 
 
-const cron = require('node-cron');
-const { resetQuoteStatusForAllUsers } = require('../utils/quoteStatus');
 
 // Schedule the reset to run at midnight in each timezone
 // This will run every hour and check if it's midnight in any timezone
