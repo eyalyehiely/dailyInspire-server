@@ -5,7 +5,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const auth = require('../middleware/auth');
 const { sendSignUpEmail } = require('../controllers/quote-sender');
-
+const { cancelSubscriptionEmail } = require('../controllers/user-controller');
 // Near the top of the file
 if (!process.env.JWT_SECRET) {
   console.error('JWT_SECRET is missing from environment variables!');
@@ -139,15 +139,38 @@ router.post('/delete-account', auth, async (req, res) => {
         message: 'Invalid password'
       });
     }
+
+    // First cancel the subscription if it exists
+    if (user.subscriptionId) {
+      const response = await fetch(`https://api.paddle.com/subscriptions/${user.subscriptionId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.PADDLE_API_KEY}`
+        },
+        body: JSON.stringify({
+          status: 'canceled'
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok || data.status !== 'canceled') {
+        return res.status(500).json({
+          message: 'Failed to cancel subscription. Please try again later.'
+        });
+      }
+    }
     
-    // Delete the user
+    // After successful subscription cancellation, delete the user account
+    await cancelSubscriptionEmail(req.user.id);
     await User.findByIdAndDelete(req.user.id);
+    
     
     res.status(200).json({
       success: true,
       message: 'Account deleted successfully'
     });
-    
   } catch (error) {
     console.error('Error deleting account:', error);
     res.status(500).json({ message: 'Server error while deleting account' });
