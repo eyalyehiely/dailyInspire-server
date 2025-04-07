@@ -243,7 +243,7 @@ router.post('/webhook', async (req, res) => {
 
                 // Get subscription details from the webhook payload
                 const subscriptionData = eventData.data;
-                const billingPeriodEnd = user.nextPaymentDate;
+                const billingPeriodEnd = user.lastCheckoutAttempt?.nextPaymentDate;
                 
                 if (!billingPeriodEnd || !(billingPeriodEnd instanceof Date) || isNaN(billingPeriodEnd.getTime())) {
                   console.error('Invalid or missing billing period end date:', billingPeriodEnd);
