@@ -245,8 +245,8 @@ router.post('/webhook', async (req, res) => {
                 const subscriptionData = eventData.data;
                 const billingPeriodEnd = user.nextPaymentDate;
                 
-                if (isNaN(billingPeriodEnd.getTime())) {
-                  console.error('Invalid billing period end date:', subscriptionData?.current_billing_period);
+                if (!billingPeriodEnd || !(billingPeriodEnd instanceof Date) || isNaN(billingPeriodEnd.getTime())) {
+                  console.error('Invalid or missing billing period end date:', billingPeriodEnd);
                   return res.status(400).json({ error: 'Invalid billing period end date' });
                 }
 
@@ -811,7 +811,17 @@ router.get('/verify-transaction/:transactionId', auth, async (req, res) => {
     return res.json({
       message: 'Transaction verified successfully',
       subscriptionId: subscriptionId,
-      status: 'active'
+      status: 'active',
+      user: {
+        id: user._id,
+        email: user.email,
+        isPay: user.isPay,
+        subscriptionStatus: user.subscriptionStatus,
+        quotesEnabled: user.quotesEnabled,
+        isRegistrationComplete: user.isRegistrationComplete,
+        cardBrand: user.cardBrand,
+        cardLastFour: user.cardLastFour
+      }
     });
   } catch (error) {
     console.error('Error verifying transaction:', error);
