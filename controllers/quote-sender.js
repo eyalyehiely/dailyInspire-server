@@ -29,7 +29,7 @@ async function fetchDailyQuote() {
 // Function to send email to a user
 async function sendQuoteEmail(email, quote) {
   const transporter = nodemailer.createTransport({
-    host: 'smtp.office365.com',
+    host: process.env.EMAIL_HOST,
     port: 587,
     secure: false, // true for 465, false for other ports
     auth: {

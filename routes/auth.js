@@ -219,7 +219,6 @@ router.get('/preferences', auth, async (req, res) => {
         quotesEnabled: user.quotesEnabled,
         cardBrand: user.cardBrand,
         cardLastFour: user.cardLastFour,
-        subscriptionStatus: user.subscriptionStatus
       }
     });
   } catch (error) {
