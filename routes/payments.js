@@ -791,6 +791,8 @@ router.get('/verify-transaction/:transactionId', auth, async (req, res) => {
         subscriptionId: subscriptionId,
         subscriptionStatus: 'active',
         isPay: true,
+        cardBrand: req.query.cardBrand,
+        cardLastFour: req.query.cardLastFour,
         quotesEnabled: true,
         isRegistrationComplete: true,
         paymentUpdatedAt: new Date()
