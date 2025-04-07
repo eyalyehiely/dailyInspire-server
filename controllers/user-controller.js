@@ -58,7 +58,6 @@ const sendWelcomeEmail = async (user_id) => {
           <h3 style="margin-top: 0; color: #0066cc;">Premium Subscription Activated</h3>
           <p>Thank you for subscribing to our premium service! Your account has been upgraded and you now have access to all premium features.</p>
           <p><strong>Subscription Status:</strong> Active</p>
-          <p><strong>Subscription ID:</strong> ${user.subscriptionId || 'N/A'}</p>
 
         </div>` 
       : '';

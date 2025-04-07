@@ -131,13 +131,23 @@ router.post('/webhook', async (req, res) => {
             case EventName.SubscriptionActivated:
               console.log(`Subscription ${eventData.data.id} was activated`);
               try {
+                // Check if user's subscription is already active
+                const user = await User.findById(userId);
+                if (!user) {
+                  console.error('User not found for ID:', userId);
+                  return res.status(404).json({ error: 'User not found' });
+                }
 
-                console.log('Sending welcome email to:', userId);
-                await sendWelcomeEmail(userId);
+                // Only send welcome email if subscription wasn't already active
+                if (user.subscriptionStatus !== 'active') {
+                  console.log('Sending welcome email to:', userId);
+                  await sendWelcomeEmail(userId);
+                } else {
+                  console.log('Welcome email already sent for user:', userId);
+                }
               } catch (error) {
                 console.error('Error sending welcome email:', error);
                 // Don't fail the webhook for email errors
-                
               }
               break;
 
