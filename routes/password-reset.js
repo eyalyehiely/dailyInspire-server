@@ -4,19 +4,9 @@ const crypto = require('crypto');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
+const transporter = require('../controllers/transporter');
 
-// Setup nodemailer for email sending
-const getTransporter = () => {
-  // If in production, use configured email service
-    return nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE,
-      auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASSWORD
-        }
-      });
-  } 
-  
+
 
 // Implement rate limiting for security
 const resetRequestsMap = new Map();
@@ -127,12 +117,7 @@ router.post('/forgot-password', async (req, res) => {
     
     // Send the email
     try {
-      const transporter = getTransporter();
-      console.log('Email transport configured with:', {
-        service: process.env.EMAIL_SERVICE,
-        user: process.env.EMAIL_USER,
-        hasPassword: !!process.env.EMAIL_PASSWORD,
-      });
+      
       await transporter.sendMail(mailOptions);
       console.log(`Password reset email sent to ${user.email}`);
     } catch (emailError) {
@@ -253,7 +238,6 @@ router.post('/reset-password', async (req, res) => {
         html: emailContent
       };
       
-      const transporter = getTransporter();
       await transporter.sendMail(mailOptions);
       console.log(`Password change confirmation email sent to ${user.email}`);
     } catch (emailError) {

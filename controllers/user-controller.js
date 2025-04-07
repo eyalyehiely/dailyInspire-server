@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const User = require('../models/User');
 const { paddleApi } = require('../controllers/paddle-controller');
+const transporter = require('../controllers/transporter')
 
 // Function to send welcome email after signup
 const sendWelcomeEmail = async (user_id) => {
@@ -22,19 +23,13 @@ const sendWelcomeEmail = async (user_id) => {
     });
 
     console.log('Email configuration:', {
-      service: process.env.EMAIL_SERVICE || 'gmail',
+      service: process.env.EMAIL_HOST ,
       user: process.env.EMAIL_USER ? 'Set' : 'Not set',
       password: process.env.EMAIL_PASSWORD ? 'Set' : 'Not set',
       from: process.env.EMAIL_FROM || `Daily Inspirational Quotes <${process.env.EMAIL_USER}>`
     });
     
-    const transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
+    
 
     // Sample quote to give them a preview
     const sampleQuote = {
@@ -124,14 +119,7 @@ const sendWelcomeEmail = async (user_id) => {
 
 const sendEmailToOwner = async (user) => {
   try {
-    const transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
-
+    
     // Format the preferred time for display
     const timeFormat = new Intl.DateTimeFormat('en', {
       hour: 'numeric',
@@ -179,14 +167,6 @@ const sendPaymentFailedEmail = async (user_id) => {
       console.error('User not found for ID:', user_id);
       return;
     }
-
-    const transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
 
     // Send email to user
     const userMailOptions = {
@@ -257,13 +237,7 @@ const cancelSubscriptionEmail = async (user_id, billingPeriodEnd) => {
       day: 'numeric' 
     });
 
-    const transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
+    
 
     const mailOptions = {
       from: process.env.EMAIL_FROM || `Daily Inspirational Quotes <${process.env.EMAIL_USER}>`,
@@ -299,13 +273,7 @@ const sendPaymentMethodUpdatedEmail = async (user_id) => {
       return;
     }
 
-    const transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'gmail',
-      auth: { 
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
+   
 
     const mailOptions = {
       from: process.env.EMAIL_FROM || `Daily Inspirational Quotes <${process.env.EMAIL_USER}>`, 

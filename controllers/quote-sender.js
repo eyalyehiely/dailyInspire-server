@@ -4,7 +4,7 @@ const nodemailer = require('nodemailer');
 const User = require('../models/User');
 const { DateTime } = require('luxon'); // We'll need to add this dependency
 const { isQuoteSentToday, updateQuoteStatus } = require('../utils/quoteStatus');
-
+const transporter = require('../controllers/transporter');
 // Function to get a quote from the API
 async function fetchDailyQuote() {
   try {
@@ -28,19 +28,6 @@ async function fetchDailyQuote() {
 
 // Function to send email to a user
 async function sendQuoteEmail(email, quote) {
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: 587,
-    secure: false, // true for 465, false for other ports
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD
-    },
-    tls: {
-      ciphers: 'SSLv3',
-      rejectUnauthorized: false
-    }
-  });
 
   const mailOptions = {
     from: process.env.EMAIL_FROM || `Daily Inspiration <${process.env.EMAIL_USER}>`,
@@ -86,40 +73,7 @@ async function sendQuoteEmail(email, quote) {
 
 
 
-// Function to send email to a user
-async function sendSignUpEmail(email, quote) {
-  const transporter = nodemailer.createTransport({
-    service: process.env.EMAIL_SERVICE,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD
-    }
-  });
 
-  const mailOptions = {
-    from: process.env.EMAIL_FROM || `Daily Inspiration <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: 'Thank you for signing up!',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2>Thank you for signing up!</h2>
-        <p>We're excited to have you on board. We'll be sending you a daily quote every day at your preferred time.</p>
-        <p>If you have any questions or need assistance, please don't hesitate to contact us.</p>
-        <p>Thank you for choosing our service!</p>
-        <p>The Daily Quote Team</p>
-      </div>
-    `
-  };
-
-  
-
-  try {
-    await transporter.sendMail(mailOptions);
-    console.log(`Quote sent successfully to ${email}`);
-  } catch (error) {
-    console.error(`Failed to send email to ${email}:`, error);
-  }
-}
 
 // Function to send quotes to users who should receive them at the current time
 async function sendQuotesToUsersForCurrentTime() {

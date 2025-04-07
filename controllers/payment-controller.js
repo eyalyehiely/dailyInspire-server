@@ -1,7 +1,5 @@
-const axios = require('axios');
 const User = require('../models/User');
-const crypto = require('crypto');
-const nodemailer = require('nodemailer');
+const transporter = require('../controllers/transporter');
 
 
 
@@ -84,14 +82,7 @@ const processSuccessfulPayment = async (userId, subscriptionId = null) => {
 // Send receipt email to user
 const sendReceiptEmail = async (user, orderData) => {
   try {
-    const transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
-
+    
     const mailOptions = {
       from: process.env.EMAIL_FROM || `DailyInspire <${process.env.EMAIL_USER}>`,
       to: user.email,

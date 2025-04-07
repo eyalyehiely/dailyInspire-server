@@ -1,7 +1,7 @@
 const axios = require('axios');
 const User = require('../models/User');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
+const transporter = require('../controllers/transporter');
 
 // Initialize Paddle API client
 const paddleApi = axios.create({
@@ -105,13 +105,7 @@ const sendReceiptEmail = async (user, { orderId }) => {
       password: process.env.EMAIL_PASSWORD ? 'Set' : 'Not set'
     });
     
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    });
+    
 
     const mailOptions = {
       from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
