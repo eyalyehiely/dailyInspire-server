@@ -148,11 +148,10 @@ router.post('/webhook', async (req, res) => {
               try {
 
                 const user = await User.findById(userId);
-                // const customerId = eventData.data?.customerId;
-                // if (!user) {
-                //   console.error('❌ User not found for ID:', userId);
-                //   return res.status(404).json({ error: 'User not found' });
-                // }
+                if (!user) {
+                  console.error('❌ User not found for ID:', userId);
+                  return res.status(404).json({ error: 'User not found' });
+                }
 
                 const response = await fetch(`${process.env.PADDLE_API_URL}/customers/${customerId}/payment-methods`, {
                   method: 'GET',
@@ -175,13 +174,26 @@ router.post('/webhook', async (req, res) => {
                   throw new Error('No card payment method found');
                 }
 
-                user.cardBrand = paymentMethod.card.type;
-                user.cardLastFour = paymentMethod.card.last4;
-                user.quotesEnabled = true;
-                user.isPay = true;
-                user.subscriptionStatus = 'active';
-                
-                await user.save();
+                // Update user with new payment method details
+                const updateData = {
+                  cardBrand: paymentMethod.card.type,
+                  cardLastFour: paymentMethod.card.last4,
+                  quotesEnabled: true,
+                  isPay: true,
+                  subscriptionStatus: 'active',
+                  paymentUpdatedAt: new Date()
+                };
+
+                const updatedUser = await User.findByIdAndUpdate(
+                  userId,
+                  updateData,
+                  { new: true }
+                );
+
+                if (!updatedUser) {
+                  throw new Error('Failed to update user payment details');
+                }
+
                 console.log('✅ User card details updated successfully');
                 await sendPaymentMethodUpdatedEmail(userId);
                 return res.status(200).json({ success: true });
