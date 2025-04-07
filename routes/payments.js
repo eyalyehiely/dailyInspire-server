@@ -739,11 +739,12 @@ router.get('/verify-transaction/:transactionId', auth, async (req, res) => {
       });
     }
     
-    if (!req.params.transactionId) {
-      console.error('No transaction ID provided');
+    // Check if transactionId is null or 'null'
+    if (!req.params.transactionId || req.params.transactionId === 'null') {
+      console.error('Invalid transaction ID provided');
       return res.status(400).json({ 
-        message: 'Transaction ID is required',
-        error: 'No transaction ID provided'
+        message: 'Invalid transaction ID',
+        error: 'A valid transaction ID is required'
       });
     }
     
@@ -798,33 +799,23 @@ router.get('/verify-transaction/:transactionId', auth, async (req, res) => {
     );
     
     if (!user) {
-      console.error('User not found:', req.user.id);
-      return res.status(404).json({ 
-        message: 'User not found',
-        error: 'User not found in database'
+      console.error('Failed to update user subscription data');
+      return res.status(500).json({
+        message: 'Failed to update user subscription',
+        error: 'User update failed'
       });
     }
     
-    console.log('User subscription updated successfully');
-    
     return res.json({
-      success: true,
       message: 'Transaction verified successfully',
-      transaction: transaction,
-      user: {
-        id: user._id,
-        email: user.email,
-        isPay: user.isPay,
-        subscriptionStatus: user.subscriptionStatus,
-        quotesEnabled: user.quotesEnabled
-      }
+      subscriptionId: subscriptionId,
+      status: 'active'
     });
   } catch (error) {
     console.error('Error verifying transaction:', error);
-    return res.status(500).json({ 
-      message: 'Server error', 
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    return res.status(500).json({
+      message: 'Error verifying transaction',
+      error: error.message
     });
   }
 });
