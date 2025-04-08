@@ -48,7 +48,10 @@ const processSuccessfulPayment = async (userId, subscriptionId = null) => {
         quotesEnabled: true,
         subscriptionId: subscriptionId || existingUser.subscriptionId || 'unknown',
         subscriptionStatus: 'active',
-        paymentUpdatedAt: new Date() // Add timestamp for payment update
+        paymentUpdatedAt: new Date(), // Add timestamp for payment update
+        'lastCheckoutAttempt.firstPaymentDate': new Date(),
+        'lastCheckoutAttempt.nextPaymentDate': new Date(new Date().setMonth(new Date().getMonth() + 1)),
+        'lastCheckoutAttempt.timestamp': new Date()
       },
       { new: true }
     );
