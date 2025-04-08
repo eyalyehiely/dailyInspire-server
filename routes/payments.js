@@ -146,6 +146,21 @@ router.post('/create-subscription', auth, async (req, res) => {
 
     const transaction = response.data.data;
     
+    // Update user's last checkout attempt
+    const now = new Date();
+    const nextPaymentDate = new Date(now);
+    nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+
+    await User.findByIdAndUpdate(req.user.id, {
+      'lastCheckoutAttempt': {
+        url: transaction.checkout?.url,
+        firstPaymentDate: now,
+        nextPaymentDate: nextPaymentDate,
+        timestamp: now
+      },
+      paymentUpdatedAt: now
+    });
+    
     // Return the transaction ID and checkout URL
     return res.json({
       transactionId: transaction.id,
@@ -197,13 +212,20 @@ router.post('/webhook', async (req, res) => {
                             return res.status(404).json({ error: 'User not found' });
                         }
 
+                        const now = new Date();
+                        const nextPaymentDate = new Date(now);
+                        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+
                         // Update user's subscription status
                         await User.findByIdAndUpdate(user._id, {
                             subscriptionStatus: 'active',
                             subscriptionId: subscriptionId,
                             isPay: true,
                             quotesEnabled: true,
-                            paymentUpdatedAt: new Date()
+                            paymentUpdatedAt: now,
+                            'lastCheckoutAttempt.firstPaymentDate': now,
+                            'lastCheckoutAttempt.nextPaymentDate': nextPaymentDate,
+                            'lastCheckoutAttempt.timestamp': now
                         });
 
                         // Send welcome email if subscription wasn't already active
@@ -225,12 +247,16 @@ router.post('/webhook', async (req, res) => {
                             return res.status(404).json({ error: 'User not found' });
                         }
 
+                        const now = new Date();
+
                         // Update user's subscription status
                         await User.findByIdAndUpdate(user._id, {
                             subscriptionStatus: 'canceled',
                             isPay: false,
                             quotesEnabled: false,
-                            paymentUpdatedAt: new Date()
+                            paymentUpdatedAt: now,
+                            'lastCheckoutAttempt.canceledAt': now,
+                            'lastCheckoutAttempt.timestamp': now
                         });
 
                         await cancelSubscriptionEmail(user._id);
