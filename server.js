@@ -27,7 +27,7 @@ app.use(cors({
 }));
 
 // Add raw body middleware for webhook verification
-app.use('/api/payments/webhook', rawBody);
+app.use('/api/webhook', rawBody);
 
 app.use(express.json());
 

@@ -13,8 +13,21 @@ router.post('/webhook', async (req, res) => {
     console.log('\n===== NEW WEBHOOK RECEIVED =====');
     
     const signature = req.headers['paddle-signature'];
-    const rawRequestBody = req.body;
+    const rawRequestBody = req.rawBody;
     const secretKey = process.env.PADDLE_WEBHOOK_SECRET;
+
+    console.log('Webhook verification details:', {
+        hasSignature: !!signature,
+        hasRawBody: !!rawRequestBody,
+        hasSecretKey: !!secretKey,
+        contentType: req.get('Content-Type'),
+        headers: {
+            'paddle-signature': signature,
+            'content-type': req.get('Content-Type')
+        },
+        bodyLength: rawRequestBody ? rawRequestBody.length : 0,
+        bodyPreview: rawRequestBody ? rawRequestBody.toString().substring(0, 100) : null
+    });
 
     try {
         if (signature && rawRequestBody) {
