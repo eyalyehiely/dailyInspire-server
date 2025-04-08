@@ -38,13 +38,16 @@ const sendWelcomeEmail = async (user_id) => {
     };
 
     // Format the preferred time for display
+    const [hours, minutes] = (user.preferredTime || '09:00').split(':');
+    const now = new Date();
+    now.setHours(parseInt(hours), parseInt(minutes), 0, 0);
     const timeFormat = new Intl.DateTimeFormat('en', {
       hour: 'numeric',
       minute: 'numeric',
       hour12: true,
       timeZone: user.timezone || 'UTC'
     });
-    const formattedTime = timeFormat.format(new Date(`2000-01-01T${user.preferredTime || '09:00'}`));
+    const formattedTime = timeFormat.format(now);
 
     // Check if this is a subscription welcome email
     const isSubscriptionWelcome = user.isPay === true;
