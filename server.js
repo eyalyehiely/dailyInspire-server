@@ -29,12 +29,7 @@ app.use(cors({
 // Add raw body middleware for webhook verification
 app.use('/api/payments/webhook', rawBody);
 
-// Parse JSON and URL-encoded bodies for all other routes
 app.use(express.json());
-
-// Add webhook logger middleware AFTER body parsing
-const webhookLogger = require('./middleware/webhook-logger');
-app.use(webhookLogger);
 
 // Call this before setting up routes
 connectDB();
