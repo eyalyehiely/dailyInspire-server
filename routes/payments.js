@@ -187,7 +187,8 @@ router.get('/status', auth, async (req, res) => {
     
     // Get active subscription for the user
     const subscription = await paddleApi.get(`/subscriptions/${user.subscriptionId}`);
-    const activeSubscription = subscription.data.data.status;
+    const subscriptionData = subscription.data.data;
+    const activeSubscription = subscriptionData.status;
     
     // If user has a subscription ID, fetch details from Paddle API
     let cardBrand = user.cardBrand || "";
@@ -204,8 +205,8 @@ router.get('/status', auth, async (req, res) => {
     
     if (activeSubscription=="active") {
       try {
-        console.log('Fetching subscription details from Paddle for ID:', activeSubscription.paddleSubscriptionId);
-        const paddleSubscription = await subscriptionService.getSubscription(activeSubscription.paddleSubscriptionId);
+        console.log('Fetching subscription details from Paddle for ID:', user.subscriptionId);
+        const paddleSubscription = await subscriptionService.getSubscription(user.subscriptionId);
         
         // Check if response follows Paddle's API format
         if (paddleSubscription && paddleSubscription.data) {
