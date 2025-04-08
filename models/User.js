@@ -20,6 +20,11 @@ const UserSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  paddleCustomerId: {
+    type: String,
+    default: null,
+    index: true
+  },
   quotesEnabled: {
     type: Boolean,
     default: true
