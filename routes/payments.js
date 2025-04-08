@@ -318,85 +318,85 @@ router.get('/status', auth, async (req, res) => {
 });
 
 
-// Route to update user payment data
-router.post('/update-user-data', auth, async (req, res) => {
-  try {
-    const { subscriptionId, subscriptionStatus, cardBrand, cardLastFour, firstPaymentDate, nextPaymentDate } = req.body;
+// // Route to update user payment data
+// router.post('/update-user-data', auth, async (req, res) => {
+//   try {
+//     const { subscriptionId, subscriptionStatus, cardBrand, cardLastFour, firstPaymentDate, nextPaymentDate } = req.body;
     
-    console.log('Received update-user-data request with card details:', {
-      cardBrand,
-      cardLastFour,
-      subscriptionId,
-      subscriptionStatus
-    });
+//     console.log('Received update-user-data request with card details:', {
+//       cardBrand,
+//       cardLastFour,
+//       subscriptionId,
+//       subscriptionStatus
+//     });
     
-    if (!subscriptionId) {
-      return res.status(400).json({ error: 'Subscription ID is required' });
-    }
+//     if (!subscriptionId) {
+//       return res.status(400).json({ error: 'Subscription ID is required' });
+//     }
     
-    // Use the subscription ID as is, without adding any prefix
-    const formattedSubscriptionId = subscriptionId;
-    console.log(`Using subscription ID: ${formattedSubscriptionId}`);
+//     // Use the subscription ID as is, without adding any prefix
+//     const formattedSubscriptionId = subscriptionId;
+//     console.log(`Using subscription ID: ${formattedSubscriptionId}`);
     
-    // Get current date in Israel timezone
-    const now = new Date();
-    const israelTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
-    // Calculate next payment date (same date next month)
-    const calculatedNextPaymentDate = new Date(israelTime);
-    calculatedNextPaymentDate.setMonth(calculatedNextPaymentDate.getMonth() + 1);
+//     // Get current date in Israel timezone
+//     const now = new Date();
+//     const israelTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Jerusalem' }));
+//     // Calculate next payment date (same date next month)
+//     const calculatedNextPaymentDate = new Date(israelTime);
+//     calculatedNextPaymentDate.setMonth(calculatedNextPaymentDate.getMonth() + 1);
     
-    // Update user's subscription data
-    const updateData = {
-      subscriptionId: formattedSubscriptionId,
-      subscriptionStatus: subscriptionStatus || 'active',
-      isPay: true,
-      quotesEnabled: true,
-      isRegistrationComplete: true,
-      paymentUpdatedAt: new Date(),
-      cardBrand: cardBrand,
-      cardLastFour: cardLastFour,
-      'lastCheckoutAttempt.firstPaymentDate': firstPaymentDate || israelTime,
-      'lastCheckoutAttempt.nextPaymentDate': nextPaymentDate || calculatedNextPaymentDate,
-      'lastCheckoutAttempt.timestamp': new Date()
-    };
+//     // Update user's subscription data
+//     const updateData = {
+//       subscriptionId: formattedSubscriptionId,
+//       subscriptionStatus: subscriptionStatus || 'active',
+//       isPay: true,
+//       quotesEnabled: true,
+//       isRegistrationComplete: true,
+//       paymentUpdatedAt: new Date(),
+//       cardBrand: cardBrand,
+//       cardLastFour: cardLastFour,
+//       'lastCheckoutAttempt.firstPaymentDate': firstPaymentDate || israelTime,
+//       'lastCheckoutAttempt.nextPaymentDate': nextPaymentDate || calculatedNextPaymentDate,
+//       'lastCheckoutAttempt.timestamp': new Date()
+//     };
     
-    console.log('Updating user with data:', updateData);
+//     console.log('Updating user with data:', updateData);
     
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      updateData,
-      { new: true }
-    );
+//     const user = await User.findByIdAndUpdate(
+//       req.user.id,
+//       updateData,
+//       { new: true }
+//     );
     
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+//     if (!user) {
+//       return res.status(404).json({ error: 'User not found' });
+//     }
     
-    console.log('User updated successfully with card details:', {
-      cardBrand: user.cardBrand,
-      cardLastFour: user.cardLastFour
-    });
+//     console.log('User updated successfully with card details:', {
+//       cardBrand: user.cardBrand,
+//       cardLastFour: user.cardLastFour
+//     });
     
-    return res.json({
-      success: true,
-      user: {
-        id: user._id,
-        email: user.email,
-        isPay: user.isPay,
-        subscriptionStatus: user.subscriptionStatus,
-        quotesEnabled: user.quotesEnabled,
-        isRegistrationComplete: user.isRegistrationComplete,
-        cardBrand: user.cardBrand,
-        cardLastFour: user.cardLastFour,
-        firstPaymentDate: user.lastCheckoutAttempt?.firstPaymentDate,
-        nextPaymentDate: user.lastCheckoutAttempt?.nextPaymentDate
-      }
-    });
-  } catch (error) {
-    console.error('Error updating user data:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
+//     return res.json({
+//       success: true,
+//       user: {
+//         id: user._id,
+//         email: user.email,
+//         isPay: user.isPay,
+//         subscriptionStatus: user.subscriptionStatus,
+//         quotesEnabled: user.quotesEnabled,
+//         isRegistrationComplete: user.isRegistrationComplete,
+//         cardBrand: user.cardBrand,
+//         cardLastFour: user.cardLastFour,
+//         firstPaymentDate: user.lastCheckoutAttempt?.firstPaymentDate,
+//         nextPaymentDate: user.lastCheckoutAttempt?.nextPaymentDate
+//       }
+//     });
+//   } catch (error) {
+//     console.error('Error updating user data:', error);
+//     return res.status(500).json({ error: error.message });
+//   }
+// });
 
 // Route to verify a transaction with Paddle
 router.get('/verify-transaction/:transactionId', auth, async (req, res) => {
@@ -479,7 +479,13 @@ router.get('/verify-transaction/:transactionId', auth, async (req, res) => {
         cardLastFour: req.query.cardLastFour,
         quotesEnabled: true,
         isRegistrationComplete: true,
-        paymentUpdatedAt: new Date()
+        paymentUpdatedAt: new Date(),
+        lastCheckoutAttempt: {
+          url: transaction.checkout?.url,
+          firstPaymentDate: transaction.first_billed_at,
+          nextPaymentDate: transaction.next_payment_date,
+          timestamp: transaction.timestamp
+        }
       },
       { new: true }
     );
