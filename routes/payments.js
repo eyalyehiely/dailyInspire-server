@@ -173,31 +173,32 @@ router.post('/webhook', async (req, res) => {
     try {
         if (signature && rawRequestBody) {
             const eventData = await paddle.webhooks.unmarshal(rawRequestBody, secretKey, signature);
-            const userId = eventData.data?.customData?.user_id;
-            const customerId = eventData.data?.customerId;
-            const subscriptionId = eventData.data?.subscription_id;
+            const subscriptionId = eventData.data?.id;
+            const customerId = eventData.data?.customer_id;
             const transactionId = eventData.data?.transaction_id;
             
             console.log('Webhook Event:', {
                 type: eventData.eventType,
-                userId,
-                customerId,
                 subscriptionId,
-                transactionId
+                customerId,
+                transactionId,
+                status: eventData.data?.status,
+                canceledAt: eventData.data?.canceled_at
             });
 
             switch (eventData.eventType) {
                 case EventName.SubscriptionActivated:
                     console.log(`Subscription ${subscriptionId} was activated`);
                     try {
-                        const user = await User.findById(userId);
+                        // Find user by subscription ID
+                        const user = await User.findOne({ subscriptionId });
                         if (!user) {
-                            console.error('User not found for ID:', userId);
+                            console.error('User not found for subscription ID:', subscriptionId);
                             return res.status(404).json({ error: 'User not found' });
                         }
 
                         // Update user's subscription status
-                        await User.findByIdAndUpdate(userId, {
+                        await User.findByIdAndUpdate(user._id, {
                             subscriptionStatus: 'active',
                             subscriptionId: subscriptionId,
                             isPay: true,
@@ -207,7 +208,7 @@ router.post('/webhook', async (req, res) => {
 
                         // Send welcome email if subscription wasn't already active
                         if (user.subscriptionStatus !== 'active') {
-                            await sendWelcomeEmail(userId);
+                            await sendWelcomeEmail(user._id);
                         }
                     } catch (error) {
                         console.error('Error processing subscription activation:', error);
@@ -215,23 +216,24 @@ router.post('/webhook', async (req, res) => {
                     break;
 
                 case EventName.SubscriptionCanceled:
-                    console.log(`Subscription ${subscriptionId} was cancelled`);
+                    console.log(`Subscription ${subscriptionId} was cancelled at ${eventData.data?.canceled_at}`);
                     try {
-                        const user = await User.findById(userId);
+                        // Find user by subscription ID
+                        const user = await User.findOne({ subscriptionId });
                         if (!user) {
-                            console.error('User not found for ID:', userId);
+                            console.error('User not found for subscription ID:', subscriptionId);
                             return res.status(404).json({ error: 'User not found' });
                         }
 
                         // Update user's subscription status
-                        await User.findByIdAndUpdate(userId, {
+                        await User.findByIdAndUpdate(user._id, {
                             subscriptionStatus: 'canceled',
                             isPay: false,
                             quotesEnabled: false,
                             paymentUpdatedAt: new Date()
                         });
 
-                        await cancelSubscriptionEmail(userId);
+                        await cancelSubscriptionEmail(user._id);
                     } catch (error) {
                         console.error('Error processing subscription cancellation:', error);
                     }
@@ -240,29 +242,36 @@ router.post('/webhook', async (req, res) => {
                 case EventName.TransactionPaymentFailed:
                     console.log(`Transaction ${transactionId} payment failed`);
                     try {
-                        await sendPaymentFailedEmail(userId);
+                        // Find user by subscription ID
+                        const user = await User.findOne({ subscriptionId });
+                        if (!user) {
+                            console.error('User not found for subscription ID:', subscriptionId);
+                            return res.status(404).json({ error: 'User not found' });
+                        }
+                        await sendPaymentFailedEmail(user._id);
                     } catch (error) {
                         console.error('Error processing payment failure:', error);
                     }
                     break;
 
                 case EventName.PaymentMethodSaved:
-                    console.log(`Payment method saved for user: ${userId}`);
+                    console.log(`Payment method saved for subscription: ${subscriptionId}`);
                     try {
-                        const user = await User.findById(userId);
+                        // Find user by subscription ID
+                        const user = await User.findOne({ subscriptionId });
                         if (!user) {
-                            console.error('User not found for ID:', userId);
+                            console.error('User not found for subscription ID:', subscriptionId);
                             return res.status(404).json({ error: 'User not found' });
                         }
 
                         // Update user's payment method details
-                        await User.findByIdAndUpdate(userId, {
+                        await User.findByIdAndUpdate(user._id, {
                             cardBrand: eventData.data?.payment_information?.card_brand,
                             cardLastFour: eventData.data?.payment_information?.last_four,
                             paymentUpdatedAt: new Date()
                         });
 
-                        await sendPaymentMethodUpdatedEmail(userId);
+                        await sendPaymentMethodUpdatedEmail(user._id);
                     } catch (error) {
                         console.error('Error processing payment method update:', error);
                     }
