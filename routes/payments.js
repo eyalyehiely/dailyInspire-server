@@ -5,7 +5,7 @@ const User = require('../models/User');
 const { Paddle } = require('@paddle/paddle-node-sdk');
 const { paddleApi} = require('../controllers/paddle-controller');
 const subscriptionService = require('../services/subscriptionService');
-const axios = require('axios');
+
 
 // Initialize Paddle SDK
 const paddle = new Paddle(process.env.PADDLE_API_KEY);
@@ -186,12 +186,7 @@ router.get('/status', auth, async (req, res) => {
     }
     
     // Get active subscription for the user
-    const subscription = await axios.get(`${process.env.PADDLE_API_URL}/subscriptions/${user.subscriptionId}`, {
-      headers: {
-        'Authorization': `Bearer ${process.env.PADDLE_API_KEY}`
-      }
-
-    });
+    const subscription = await paddleApi.get(`/subscriptions/${user.subscriptionId}`);
     const activeSubscription = subscription.data.data.status;
     
     // If user has a subscription ID, fetch details from Paddle API
