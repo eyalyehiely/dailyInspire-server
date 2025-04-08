@@ -1,5 +1,4 @@
 const axios = require('axios');
-const Subscription = require('../models/Subscription');
 const User = require('../models/User');
 
 // Initialize Paddle API client
