@@ -2,13 +2,10 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const User = require('../models/User');
-const { Paddle, EventName } = require('@paddle/paddle-node-sdk');
-const { 
-  processSuccessfulPayment,
-  paddleApi,
-} = require('../controllers/paddle-controller');
+const { Paddle } = require('@paddle/paddle-node-sdk');
+const { paddleApi} = require('../controllers/paddle-controller');
 const subscriptionService = require('../services/subscriptionService');
-const mongoose = require('mongoose');
+const axios = require('axios');
 
 // Initialize Paddle SDK
 const paddle = new Paddle(process.env.PADDLE_API_KEY);
