@@ -1,14 +1,15 @@
-const { sendWelcomeEmail, sendPaymentFailedEmail, cancelSubscriptionEmail, sendPaymentMethodUpdatedEmail } = require('../controllers/user-controller');
 const express = require('express');
 const router = express.Router();
+const { sendWelcomeEmail, sendPaymentFailedEmail, cancelSubscriptionEmail, sendPaymentMethodUpdatedEmail } = require('../controllers/user-controller');
 const User = require('../models/User');
 const { Paddle, EventName } = require('@paddle/paddle-node-sdk');
+
 
 // Initialize Paddle SDK
 const paddle = new Paddle(process.env.PADDLE_API_KEY);
 
 // Create a `POST` endpoint to accept webhooks sent by Paddle.
-router.post('/webhook', async (req, res) => {
+router.post('/', async (req, res) => {
     console.log('\n===== NEW WEBHOOK RECEIVED =====');
     
     const signature = req.headers['paddle-signature'];
