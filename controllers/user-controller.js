@@ -79,7 +79,7 @@ const sendWelcomeEmail = async (user_id) => {
           
           <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #333;">Your Preferences</h3>
-            <p><strong>Daily Quote Time:</strong> ${formattedTime}</p>
+            <p><strong>Daily Quote Time:</strong> ${user.preferredTime || '09:00'}</p>
             <p><strong>Timezone:</strong> ${user.timezone || 'UTC'}</p>
           </div>
           
@@ -145,7 +145,7 @@ const sendEmailToOwner = async (user) => {
             <h3 style="margin-top: 0; color: #333;">User Details</h3>
             <p><strong>Name:</strong> ${user.first_name}</p>
             <p><strong>Email:</strong> ${user.email}</p>
-            <p><strong>Daily Quote Time:</strong> ${formattedTime}</p>
+            <p><strong>Daily Quote Time:</strong> ${user.preferredTime || '09:00'}</p>
             <p><strong>Timezone:</strong> ${user.timezone || 'UTC'}</p>
             <p><strong>Signup Date:</strong> ${new Date().toLocaleString()}</p>
           </div>
