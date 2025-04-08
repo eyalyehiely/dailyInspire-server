@@ -7,7 +7,6 @@ const {
   processSuccessfulPayment,
   paddleApi,
 } = require('../controllers/paddle-controller');
-const { sendWelcomeEmail, sendPaymentFailedEmail, cancelSubscriptionEmail, sendPaymentMethodUpdatedEmail } = require('../controllers/user-controller');
 const subscriptionService = require('../services/subscriptionService');
 const mongoose = require('mongoose');
 
@@ -177,146 +176,7 @@ router.post('/create-subscription', auth, async (req, res) => {
   }
 });
 
-// Create a `POST` endpoint to accept webhooks sent by Paddle.
-router.post('/webhook', async (req, res) => {
-    console.log('\n===== NEW WEBHOOK RECEIVED =====');
-    
-    const signature = req.headers['paddle-signature'];
-    const rawRequestBody = req.body;
-    const secretKey = process.env.PADDLE_WEBHOOK_SECRET;
 
-    try {
-        if (signature && rawRequestBody) {
-            const eventData = await paddle.webhooks.unmarshal(rawRequestBody, secretKey, signature);
-            const subscriptionId = eventData.data?.id;
-            const customerId = eventData.data?.customer_id;
-            const transactionId = eventData.data?.transaction_id;
-            
-            console.log('Webhook Event:', {
-                type: eventData.eventType,
-                subscriptionId,
-                customerId,
-                transactionId,
-                status: eventData.data?.status,
-                canceledAt: eventData.data?.canceled_at
-            });
-
-            switch (eventData.eventType) {
-                case EventName.SubscriptionActivated:
-                    console.log(`Subscription ${subscriptionId} was activated`);
-                    try {
-                        // Find user by subscription ID
-                        const user = await User.findOne({ subscriptionId });
-                        if (!user) {
-                            console.error('User not found for subscription ID:', subscriptionId);
-                            return res.status(404).json({ error: 'User not found' });
-                        }
-
-                        const now = new Date();
-                        const nextPaymentDate = new Date(now);
-                        nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
-
-                        // Update user's subscription status
-                        await User.findByIdAndUpdate(user._id, {
-                            subscriptionStatus: 'active',
-                            subscriptionId: subscriptionId,
-                            isPay: true,
-                            quotesEnabled: true,
-                            paymentUpdatedAt: now,
-                            'lastCheckoutAttempt.firstPaymentDate': now,
-                            'lastCheckoutAttempt.nextPaymentDate': nextPaymentDate,
-                            'lastCheckoutAttempt.timestamp': now
-                        });
-
-                        // Send welcome email if subscription wasn't already active
-                        if (user.subscriptionStatus !== 'active') {
-                            await sendWelcomeEmail(user._id);
-                        }
-                    } catch (error) {
-                        console.error('Error processing subscription activation:', error);
-                    }
-                    break;
-
-                case EventName.SubscriptionCanceled:
-                    console.log(`Subscription ${subscriptionId} was cancelled at ${eventData.data?.canceled_at}`);
-                    try {
-                        // Find user by subscription ID
-                        const user = await User.findOne({ subscriptionId });
-                        if (!user) {
-                            console.error('User not found for subscription ID:', subscriptionId);
-                            return res.status(404).json({ error: 'User not found' });
-                        }
-
-                        const now = new Date();
-
-                        // Update user's subscription status
-                        await User.findByIdAndUpdate(user._id, {
-                            subscriptionStatus: 'canceled',
-                            isPay: false,
-                            quotesEnabled: false,
-                            paymentUpdatedAt: now,
-                            'lastCheckoutAttempt.canceledAt': now,
-                            'lastCheckoutAttempt.timestamp': now
-                        });
-
-                        await cancelSubscriptionEmail(user._id);
-                    } catch (error) {
-                        console.error('Error processing subscription cancellation:', error);
-                    }
-                    break;
-
-                case EventName.TransactionPaymentFailed:
-                    console.log(`Transaction ${transactionId} payment failed`);
-                    try {
-                        // Find user by subscription ID
-                        const user = await User.findOne({ subscriptionId });
-                        if (!user) {
-                            console.error('User not found for subscription ID:', subscriptionId);
-                            return res.status(404).json({ error: 'User not found' });
-                        }
-                        await sendPaymentFailedEmail(user._id);
-                    } catch (error) {
-                        console.error('Error processing payment failure:', error);
-                    }
-                    break;
-
-                case EventName.PaymentMethodSaved:
-                    console.log(`Payment method saved for subscription: ${subscriptionId}`);
-                    try {
-                        // Find user by subscription ID
-                        const user = await User.findOne({ subscriptionId });
-                        if (!user) {
-                            console.error('User not found for subscription ID:', subscriptionId);
-                            return res.status(404).json({ error: 'User not found' });
-                        }
-
-                        // Update user's payment method details
-                        await User.findByIdAndUpdate(user._id, {
-                            cardBrand: eventData.data?.payment_information?.card_brand,
-                            cardLastFour: eventData.data?.payment_information?.last_four,
-                            paymentUpdatedAt: new Date()
-                        });
-
-                        await sendPaymentMethodUpdatedEmail(user._id);
-                    } catch (error) {
-                        console.error('Error processing payment method update:', error);
-                    }
-                    break;
-
-                default:
-                    console.log(`Unhandled event type: ${eventData.eventType}`);
-            }
-        } else {
-            console.error('Invalid webhook signature or missing body');
-            return res.status(400).json({ error: 'Invalid webhook signature or missing body' });
-        }
-    } catch (error) {
-        console.error('Error processing webhook:', error);
-        return res.status(500).json({ error: 'Internal server error' });
-    }
-
-    return res.status(200).json({ received: true });
-});
 
 // Route to check user's current payment status
 router.get('/status', auth, async (req, res) => {
@@ -329,7 +189,13 @@ router.get('/status', auth, async (req, res) => {
     }
     
     // Get active subscription for the user
-    const activeSubscription = await subscriptionService.getActiveSubscription(req.user.id);
+    const subscription = await axios.get(`${process.env.PADDLE_API_URL}/subscriptions/${user.subscriptionId}`, {
+      headers: {
+        'Authorization': `Bearer ${process.env.PADDLE_API_KEY}`
+      }
+
+    });
+    const activeSubscription = subscription.data.data.status;
     
     // If user has a subscription ID, fetch details from Paddle API
     let cardBrand = user.cardBrand || "";
@@ -344,7 +210,7 @@ router.get('/status', auth, async (req, res) => {
       cardLastFour: user.cardLastFour 
     });
     
-    if (activeSubscription) {
+    if (activeSubscription=="active") {
       try {
         console.log('Fetching subscription details from Paddle for ID:', activeSubscription.paddleSubscriptionId);
         const paddleSubscription = await subscriptionService.getSubscription(activeSubscription.paddleSubscriptionId);
@@ -451,49 +317,6 @@ router.get('/status', auth, async (req, res) => {
   }
 });
 
-
-// Admin endpoint to manually upgrade a user (should be behind admin auth in production)
-router.post('/admin/force-upgrade', async (req, res) => {
-  try {
-    const { email, userId } = req.body;
-    
-    if (!email && !userId) {
-      return res.status(400).json({ error: 'Please provide either email or userId in the request body' });
-    }
-    
-    let user;
-    
-    if (email) {
-      user = await User.findOne({ email });
-    } else if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-      user = await User.findById(userId);
-    }
-    
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-    
-    // Process the upgrade
-    const subscriptionId = `admin-upgrade-${Date.now()}`;
-    const updatedUser = await processSuccessfulPayment(user._id.toString(), subscriptionId);
-    
-    // Return upgraded user information
-    return res.json({
-      success: true,
-      message: `User ${updatedUser.email} has been upgraded to paid status`,
-      user: {
-        id: updatedUser._id.toString(),
-        email: updatedUser.email,
-        name: `${updatedUser.first_name} ${updatedUser.last_name}`,
-        isPay: updatedUser.isPay,
-        subscriptionStatus: updatedUser.subscriptionStatus
-      }
-    });
-  } catch (error) {
-    console.error('Error in force-upgrade endpoint:', error);
-    return res.status(500).json({ error: error.message });
-  }
-});
 
 // Route to update user payment data
 router.post('/update-user-data', auth, async (req, res) => {

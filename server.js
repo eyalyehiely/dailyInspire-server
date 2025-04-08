@@ -15,6 +15,7 @@ const passwordResetRoutes = require('./routes/password-reset');
 const contactRoutes = require('./routes/contact');
 const testingRoutes = require('./routes/testing');
 const rawBody = require('./middleware/raw-body');
+const webhookRoutes = require('./routes/webhook');
 // Import and start the scheduler
 const { startScheduler } = require('./controllers/scheduler');
 
@@ -56,6 +57,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api', passwordResetRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/testing', testingRoutes);
+app.use('/api', webhookRoutes);
 // Protected route example - requires both authentication and complete registration
 app.get('/api/profile', auth, completeRegistration, (req, res) => {
   res.json({ user: req.user });
