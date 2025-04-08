@@ -52,7 +52,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api', passwordResetRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/testing', testingRoutes);
-app.use('/api/webhook', webhookRoutes);
+app.use('/api', webhookRoutes);
 // Protected route example - requires both authentication and complete registration
 app.get('/api/profile', auth, completeRegistration, (req, res) => {
   res.json({ user: req.user });

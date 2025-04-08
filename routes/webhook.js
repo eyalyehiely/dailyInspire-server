@@ -9,7 +9,7 @@ const { Paddle, EventName } = require('@paddle/paddle-node-sdk');
 const paddle = new Paddle(process.env.PADDLE_API_KEY);
 
 // Create a `POST` endpoint to accept webhooks sent by Paddle.
-router.post('/', async (req, res) => {
+router.post('/webhook', async (req, res) => {
     console.log('\n===== NEW WEBHOOK RECEIVED =====');
     
     const signature = req.headers['paddle-signature'];
