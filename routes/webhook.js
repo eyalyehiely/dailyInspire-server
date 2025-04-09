@@ -83,7 +83,8 @@ router.post('/webhook', async (req, res) => {
                             paymentUpdatedAt: now,
                             'lastCheckoutAttempt.firstPaymentDate': now,
                             'lastCheckoutAttempt.nextPaymentDate': nextPaymentDate,
-                            'lastCheckoutAttempt.timestamp': now
+                            'lastCheckoutAttempt.timestamp': now,
+                            quotesDisabledAfter: null // Clear any previous quotes disabled date
                         });
 
                         // Send welcome email if subscription wasn't already active
