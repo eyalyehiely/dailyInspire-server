@@ -1,8 +1,8 @@
 // Load environment variables first, before any other code
 require('dotenv').config();
 
-// Set timezone to Jerusalem/Asia
-process.env.TZ = 'Asia/Jerusalem';
+// Set timezone from environment variable
+process.env.TZ = process.env.TZ || 'Asia/Jerusalem';
 
 const express = require('express');
 const cors = require('cors');
