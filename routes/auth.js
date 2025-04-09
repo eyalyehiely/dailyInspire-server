@@ -197,7 +197,11 @@ router.get('/preferences', auth, async (req, res) => {
     
     // Check if the user has an active or valid subscription
     // Valid if isPay is true and quotesEnabled is true
-    if (!user.isPay || !user.quotesEnabled) {
+    const now = new Date();
+    const isSubscriptionValid = user.isPay && user.quotesEnabled && 
+      (!user.quotesDisabledAfter || user.quotesDisabledAfter > now);
+    
+    if (!isSubscriptionValid) {
       return res.status(403).json({ 
         message: 'Subscription required to access preferences',
         code: 'subscription_required'

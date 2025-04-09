@@ -145,6 +145,16 @@ const UserSchema = new mongoose.Schema({
   lastQuoteSentAt: {
     type: Date,
     default: null
+  },
+  quotesDisabledAfter: {
+    type: Date,
+    default: null,
+    validate: {
+      validator: function(v) {
+        return v === null || (v instanceof Date && !isNaN(v));
+      },
+      message: props => `${props.value} is not a valid date`
+    }
   }
 });
 

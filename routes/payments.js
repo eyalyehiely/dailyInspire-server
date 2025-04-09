@@ -236,15 +236,18 @@ router.get('/status', auth, async (req, res) => {
           
           if (paddleStatus !== user.subscriptionStatus) {
             console.log('Updating user status to match Paddle status');
+            const now = new Date();
             await User.findByIdAndUpdate(req.user.id, {
               subscriptionStatus: paddleStatus,
               isPay: paddleStatus === 'active',
               quotesEnabled: paddleStatus === 'active',
-              paymentUpdatedAt: new Date()
+              quotesDisabledAfter: paddleStatus === 'canceled' ? user.lastCheckoutAttempt.nextPaymentDate : null,
+              paymentUpdatedAt: now
             });
             user.subscriptionStatus = paddleStatus;
             user.isPay = paddleStatus === 'active';
             user.quotesEnabled = paddleStatus === 'active';
+            user.quotesDisabledAfter = paddleStatus === 'canceled' ? user.lastCheckoutAttempt.nextPaymentDate : null;
           }
         } else {
           console.error('Invalid Paddle API response format:', paddleSubscription);

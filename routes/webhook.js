@@ -82,7 +82,7 @@ router.post('/webhook', async (req, res) => {
                     break;
 
                 case EventName.SubscriptionCanceled:
-                    console.log(`Subscription ${subscriptionId} was cancelled at ${eventData.data?.canceled_at}`);
+                    console.log(`Subscription ${subscriptionId} was cancelled at ${eventData.data?.canceled_At}`);
                     try {
                         // Find user by subscription ID
                         const user = await User.findOne({ subscriptionId });
@@ -96,11 +96,11 @@ router.post('/webhook', async (req, res) => {
                         // Update user's subscription status
                         await User.findByIdAndUpdate(user._id, {
                             subscriptionStatus: 'canceled',
-                            isPay: false,
-                            quotesEnabled: false,
                             paymentUpdatedAt: now,
                             'lastCheckoutAttempt.canceledAt': now,
-                            'lastCheckoutAttempt.timestamp': now
+                            'lastCheckoutAttempt.timestamp': now,
+                            quotesEnabled: true,
+                            quotesDisabledAfter: user.lastCheckoutAttempt.nextPaymentDate
                         });
 
                         await cancelSubscriptionEmail(user._id);

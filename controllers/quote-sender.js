@@ -85,7 +85,13 @@ async function sendQuotesToUsersForCurrentTime() {
     
     // Find all users who should receive quotes at this time
     // based on their timezone and preferred time
-    const users = await User.find({ quotesEnabled: true });
+    const users = await User.find({ 
+      quotesEnabled: true,
+      $or: [
+        { quotesDisabledAfter: null },
+        { quotesDisabledAfter: { $gt: new Date() } }
+      ]
+    });
     
     // Filter users who should receive quotes now
     const usersToReceiveQuotes = users.filter(user => {
