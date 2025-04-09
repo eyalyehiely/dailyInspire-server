@@ -1,6 +1,9 @@
 // Load environment variables first, before any other code
 require('dotenv').config();
 
+// Set timezone to Jerusalem/Asia
+process.env.TZ = 'Asia/Jerusalem';
+
 const express = require('express');
 const cors = require('cors');
 const app = express();
@@ -64,6 +67,7 @@ startScheduler();
 // Start the server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
-  
+  console.log(`Server timezone: ${process.env.TZ}`);
+  console.log(`Current server time: ${new Date().toString()}`);
 });
 
