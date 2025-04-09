@@ -45,15 +45,29 @@ router.post('/webhook', async (req, res) => {
                 canceledAt: eventData.data?.canceled_at
             });
 
+            // Helper function to find user by subscription ID or transaction ID
+            const findUser = async () => {
+                // First try to find by subscription ID
+                let user = await User.findOne({ subscriptionId });
+                if (user) return user;
+
+                // If not found, try to find by transaction ID
+                if (transactionId) {
+                    user = await User.findOne({ 'lastCheckoutAttempt.transactionId': transactionId });
+                }
+                return user;
+            };
+
             switch (eventData.eventType) {
                 case EventName.SubscriptionActivated:
                     console.log(`Subscription ${subscriptionId} was activated`);
                     try {
-                        // Find user by subscription ID
-                        const user = await User.findOne({ subscriptionId });
+                        // Find user using the helper function
+                        const user = await findUser();
                         if (!user) {
                             console.error('User not found for subscription ID:', subscriptionId);
-                            return res.status(404).json({ error: 'User not found' });
+                            // Don't return 404 here as this might be a race condition
+                            return res.status(200).json({ received: true });
                         }
 
                         const now = new Date();
