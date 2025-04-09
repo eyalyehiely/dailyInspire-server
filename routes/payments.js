@@ -184,6 +184,10 @@ router.get('/status', auth, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+
+    if (!user.subscriptionId) {
+      return res.status(404).json({ message: 'User has no subscription ID' });
+    }
     
     // Get active subscription for the user
     const subscription = await paddleApi.get(`/subscriptions/${user.subscriptionId}`);

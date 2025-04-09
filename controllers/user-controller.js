@@ -1,6 +1,4 @@
-const nodemailer = require('nodemailer');
 const User = require('../models/User');
-const { paddleApi } = require('../controllers/paddle-controller');
 const transporter = require('../controllers/transporter')
 
 // Function to send welcome email after signup

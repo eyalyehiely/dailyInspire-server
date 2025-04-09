@@ -1,6 +1,5 @@
 require('dotenv').config(); // Load environment variables
 const axios = require('axios');
-const nodemailer = require('nodemailer');
 const User = require('../models/User');
 const { DateTime } = require('luxon'); // We'll need to add this dependency
 const { isQuoteSentToday, updateQuoteStatus } = require('../utils/quoteStatus');

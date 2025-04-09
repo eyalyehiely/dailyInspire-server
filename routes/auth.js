@@ -4,7 +4,7 @@ const User = require('../models/User');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const auth = require('../middleware/auth');
-const { cancelSubscriptionEmail } = require('../controllers/user-controller');
+
 // Near the top of the file
 if (!process.env.JWT_SECRET) {
   console.error('JWT_SECRET is missing from environment variables!');
