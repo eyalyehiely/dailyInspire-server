@@ -51,6 +51,12 @@ router.post('/webhook', async (req, res) => {
                 let user = await User.findOne({ subscriptionId });
                 if (user) return user;
 
+                // If not found, try to find by customer ID
+                if (customerId) {
+                    user = await User.findOne({ paddleCustomerId: customerId });
+                    if (user) return user;
+                }
+
                 // If not found, try to find by transaction ID
                 if (transactionId) {
                     user = await User.findOne({ 'lastCheckoutAttempt.transactionId': transactionId });
@@ -84,7 +90,8 @@ router.post('/webhook', async (req, res) => {
                             'lastCheckoutAttempt.firstPaymentDate': now,
                             'lastCheckoutAttempt.nextPaymentDate': nextPaymentDate,
                             'lastCheckoutAttempt.timestamp': now,
-                            quotesDisabledAfter: null // Clear any previous quotes disabled date
+                            quotesDisabledAfter: null, // Clear any previous quotes disabled date
+                            paddleCustomerId: customerId // Update the Paddle customer ID
                         });
 
                         // Send welcome email if subscription wasn't already active
