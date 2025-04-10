@@ -109,17 +109,10 @@ router.post('/webhook', async (req, res) => {
                     console.log(`Subscription ${subscriptionId} was cancelled at ${eventData.data?.canceled_At}`);
                     try {
                         const user = await findUser();
-                        // // Find user by subscription ID
-                        // const user = await User.findOne({ subscriptionId });
-                        // if (!user) {
-                        //     console.error('User not found for subscription ID:', subscriptionId);
-                        //     return res.status(404).json({ error: 'User not found' });
-                        // }
-
                         const now = new Date();
 
                         // Update user's subscription status
-                        await User.findByIdAndUpdate(user._id, {
+                        await User.findByIdAndUpdate(user.paddleCustomerId, {
                             subscriptionStatus: 'canceled',
                             paymentUpdatedAt: now,
                             'lastCheckoutAttempt.canceledAt': now,
@@ -127,8 +120,11 @@ router.post('/webhook', async (req, res) => {
                             quotesEnabled: true,
                             quotesDisabledAfter: user.lastCheckoutAttempt.nextPaymentDate
                         });
-
-                        await cancelSubscriptionEmail(user._id);
+                        try {
+                            await cancelSubscriptionEmail(user._id);
+                        } catch (error) {
+                            console.error('Error processing subscription cancellation email:', error);
+                        }
                     } catch (error) {
                         console.error('Error processing subscription cancellation:', error);
                     }
