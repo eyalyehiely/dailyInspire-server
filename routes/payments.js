@@ -207,7 +207,7 @@ router.get('/status', auth, async (req, res) => {
       cardLastFour: user.cardLastFour 
     });
     
-    if (activeSubscription=="active") {
+    if (activeSubscription === "active") {
       try {
         console.log('Fetching subscription details from Paddle for ID:', user.subscriptionId);
         const paddleSubscription = await subscriptionService.getSubscription(user.subscriptionId);
@@ -246,12 +246,10 @@ router.get('/status', auth, async (req, res) => {
               isPay: paddleStatus === 'active',
               quotesEnabled: paddleStatus === 'active',
               quotesDisabledAfter: paddleStatus === 'canceled' ? user.lastCheckoutAttempt.nextPaymentDate : null,
-              paymentUpdatedAt: now
+              paymentUpdatedAt: now,
+              cardBrand: cardBrand,
+              cardLastFour: cardLastFour
             });
-            user.subscriptionStatus = paddleStatus;
-            user.isPay = paddleStatus === 'active';
-            user.quotesEnabled = paddleStatus === 'active';
-            user.quotesDisabledAfter = paddleStatus === 'canceled' ? user.lastCheckoutAttempt.nextPaymentDate : null;
           }
         } else {
           console.error('Invalid Paddle API response format:', paddleSubscription);
