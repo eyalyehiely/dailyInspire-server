@@ -50,7 +50,7 @@ router.post('/webhook', async (req, res) => {
             // Helper function to find user by subscription ID or transaction ID
             const findUser = async () => {
                 // First try to find by subscription ID
-                let user = await User.findOne({ customerId });
+                let user = await User.findOne({ paddleCustomerId: customerId });
                 if (user) return user;
 
                 return user;

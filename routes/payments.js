@@ -405,7 +405,6 @@ router.get('/verify-transaction/:transactionId', auth, async (req, res) => {
           firstPaymentDate: transaction.first_billed_at,
           nextPaymentDate: transaction.next_payment_date,
           timestamp: transaction.timestamp,
-
         },
         paddleCustomerId: transaction.customer_id
       },
