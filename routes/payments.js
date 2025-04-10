@@ -106,72 +106,72 @@ router.get('/checkout-info', auth, async (req, res) => {
 });
 
 // Route to create a subscription transaction
-router.post('/create-subscription', auth, async (req, res) => {
-  try {
-    const { priceId, quantity = 1 } = req.body;
+// router.post('/create-subscription', auth, async (req, res) => {
+//   try {
+//     const { priceId, quantity = 1 } = req.body;
     
-    if (!priceId) {
-      return res.status(400).json({ error: 'Price ID is required' });
-    }
+//     if (!priceId) {
+//       return res.status(400).json({ error: 'Price ID is required' });
+//     }
 
-    // Get user details
-    const user = await User.findById(req.user.id);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+//     // Get user details
+//     const user = await User.findById(req.user.id);
+//     if (!user) {
+//       return res.status(404).json({ error: 'User not found' });
+//     }
 
-    // Create transaction with automatic collection mode
-    const transactionData = {
-      items: [
-        {
-          price_id: priceId,
-          quantity: quantity
-        }
-      ],
-      collection_mode: "automatic",
-      custom_data: {
-        user_id: user._id.toString()
-      }
-    };
+//     // Create transaction with automatic collection mode
+//     const transactionData = {
+//       items: [
+//         {
+//           price_id: priceId,
+//           quantity: quantity
+//         }
+//       ],
+//       collection_mode: "automatic",
+//       custom_data: {
+//         user_id: user._id.toString()
+//       }
+//     };
 
-    const response = await paddleApi.post('/transactions', transactionData);
+//     const response = await paddleApi.post('/transactions', transactionData);
     
-    if (!response.data || !response.data.data) {
-      throw new Error('Invalid response from Paddle API');
-    }
+//     if (!response.data || !response.data.data) {
+//       throw new Error('Invalid response from Paddle API');
+//     }
 
-    const transaction = response.data.data;
+//     const transaction = response.data.data;
     
-    // Update user's last checkout attempt
-    const now = new Date();
-    const nextPaymentDate = new Date(now);
-    nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
+//     // Update user's last checkout attempt
+//     const now = new Date();
+//     const nextPaymentDate = new Date(now);
+//     nextPaymentDate.setMonth(nextPaymentDate.getMonth() + 1);
 
-    await User.findByIdAndUpdate(req.user.id, {
-      'lastCheckoutAttempt': {
-        url: transaction.checkout?.url,
-        firstPaymentDate: now,
-        nextPaymentDate: nextPaymentDate,
-        timestamp: now
-      },
-      paymentUpdatedAt: now
-    });
+//     await User.findByIdAndUpdate(req.user.id, {
+//       'lastCheckoutAttempt': {
+//         url: transaction.checkout?.url,
+//         firstPaymentDate: now,
+//         nextPaymentDate: nextPaymentDate,
+//         timestamp: now
+//       },
+//       paymentUpdatedAt: now
+//     });
     
-    // Return the transaction ID and checkout URL
-    return res.json({
-      transactionId: transaction.id,
-      checkoutUrl: transaction.checkout?.url,
-      status: transaction.status
-    });
+//     // Return the transaction ID and checkout URL
+//     return res.json({
+//       transactionId: transaction.id,
+//       checkoutUrl: transaction.checkout?.url,
+//       status: transaction.status
+//     });
 
-  } catch (error) {
-    console.error('Error creating subscription transaction:', error);
-    return res.status(500).json({ 
-      error: 'Failed to create subscription transaction',
-      details: error.message
-    });
-  }
-});
+//   } catch (error) {
+//     console.error('Error creating subscription transaction:', error);
+//     return res.status(500).json({ 
+//       error: 'Failed to create subscription transaction',
+//       details: error.message
+//     });
+//   }
+// });
 
 
 
@@ -404,8 +404,10 @@ router.get('/verify-transaction/:transactionId', auth, async (req, res) => {
           url: transaction.checkout?.url,
           firstPaymentDate: transaction.first_billed_at,
           nextPaymentDate: transaction.next_payment_date,
-          timestamp: transaction.timestamp
-        }
+          timestamp: transaction.timestamp,
+
+        },
+        paddleCustomerId: transaction.data.customer_id
       },
       { new: true }
     );

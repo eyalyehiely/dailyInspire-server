@@ -39,28 +39,18 @@ router.post('/webhook', async (req, res) => {
             console.log('Webhook Event:', {
                 type: eventData.eventType,
                 subscriptionId,
-                customerId,
-                transactionId,
-                status: eventData.data?.status,
-                canceledAt: eventData.data?.canceled_at
+                // customerId,
+                // transactionId,
+                // status: eventData.data?.status,
+                // canceledAt: eventData.data?.canceled_at
             });
 
             // Helper function to find user by subscription ID or transaction ID
             const findUser = async () => {
                 // First try to find by subscription ID
-                let user = await User.findOne({ subscriptionId });
+                let user = await User.findOne({ paddleCustomerId });
                 if (user) return user;
 
-                // If not found, try to find by customer ID
-                if (customerId) {
-                    user = await User.findOne({ paddleCustomerId: customerId });
-                    if (user) return user;
-                }
-
-                // If not found, try to find by transaction ID
-                if (transactionId) {
-                    user = await User.findOne({ 'lastCheckoutAttempt.transactionId': transactionId });
-                }
                 return user;
             };
 
