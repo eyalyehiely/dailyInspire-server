@@ -305,5 +305,6 @@ module.exports = {
   sendWelcomeEmail,
   sendEmailToOwner,
   sendPaymentFailedEmail,
-  cancelSubscriptionEmail
+  cancelSubscriptionEmail,
+  sendPaymentMethodUpdatedEmail
 }; 
