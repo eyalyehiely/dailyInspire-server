@@ -31,10 +31,12 @@ router.post('/webhook', async (req, res) => {
 
     try {
         if (signature && rawRequestBody) {
+            console.log('eventData', eventData);
             const eventData = await paddle.webhooks.unmarshal(rawRequestBody, secretKey, signature);
             const subscriptionId = eventData.data?.id;
             const customerId = eventData.data?.customer_id;
             const transactionId = eventData.data?.transaction_id;
+
             
             console.log('Webhook Event:', {
                 type: eventData.eventType,
@@ -48,7 +50,7 @@ router.post('/webhook', async (req, res) => {
             // Helper function to find user by subscription ID or transaction ID
             const findUser = async () => {
                 // First try to find by subscription ID
-                let user = await User.findOne({ paddleCustomerId });
+                let user = await User.findOne({ customerId });
                 if (user) return user;
 
                 return user;
@@ -96,12 +98,13 @@ router.post('/webhook', async (req, res) => {
                 case EventName.SubscriptionCanceled:
                     console.log(`Subscription ${subscriptionId} was cancelled at ${eventData.data?.canceled_At}`);
                     try {
-                        // Find user by subscription ID
-                        const user = await User.findOne({ subscriptionId });
-                        if (!user) {
-                            console.error('User not found for subscription ID:', subscriptionId);
-                            return res.status(404).json({ error: 'User not found' });
-                        }
+                        const user = await findUser();
+                        // // Find user by subscription ID
+                        // const user = await User.findOne({ subscriptionId });
+                        // if (!user) {
+                        //     console.error('User not found for subscription ID:', subscriptionId);
+                        //     return res.status(404).json({ error: 'User not found' });
+                        // }
 
                         const now = new Date();
 
