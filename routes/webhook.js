@@ -31,8 +31,8 @@ router.post('/webhook', async (req, res) => {
 
     try {
         if (signature && rawRequestBody) {
-            console.log('eventData', eventData);
             const eventData = await paddle.webhooks.unmarshal(rawRequestBody, secretKey, signature);
+            console.log('eventData', eventData);
             const subscriptionId = eventData.data?.id;
             const customerId = eventData.data?.customer_id;
             const transactionId = eventData.data?.transaction_id;
