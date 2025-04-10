@@ -148,10 +148,10 @@ router.post('/webhook', async (req, res) => {
                 case EventName.PaymentMethodSaved:
                     console.log(`Payment method saved for subscription: ${subscriptionId}`);
                     try {
-                        // Find user by customer ID instead of subscription ID
-                        const user = await findUser();
+                        // Find user by customer ID
+                        const user = await User.findOne({ paddleCustomerId: eventData.data.customerId });
                         if (!user) {
-                            console.error('User not found for customer ID:', customerId);
+                            console.error('User not found for customer ID:', eventData.data.customerId);
                             return res.status(404).json({ error: 'User not found' });
                         }
 
