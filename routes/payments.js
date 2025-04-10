@@ -407,7 +407,7 @@ router.get('/verify-transaction/:transactionId', auth, async (req, res) => {
           timestamp: transaction.timestamp,
 
         },
-        paddleCustomerId: transaction.data.customer_id
+        paddleCustomerId: transaction.customer_id
       },
       { new: true }
     );
