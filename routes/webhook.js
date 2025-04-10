@@ -112,7 +112,7 @@ router.post('/webhook', async (req, res) => {
                         const now = new Date();
 
                         // Update user's subscription status
-                        await User.findByIdAndUpdate(user.paddleCustomerId, {
+                        await User.findByIdAndUpdate(user._id, {
                             subscriptionStatus: 'canceled',
                             paymentUpdatedAt: now,
                             'lastCheckoutAttempt.canceledAt': now,
