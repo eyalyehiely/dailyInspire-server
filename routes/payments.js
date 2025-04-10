@@ -425,6 +425,7 @@ router.get('/verify-transaction/:transactionId', auth, async (req, res) => {
         id: updatedUser._id,
         email: updatedUser.email,
         isPay: updatedUser.isPay,
+        subscriptionId: updatedUser.subscriptionId,
         subscriptionStatus: updatedUser.subscriptionStatus,
         quotesEnabled: updatedUser.quotesEnabled,
         isRegistrationComplete: updatedUser.isRegistrationComplete,

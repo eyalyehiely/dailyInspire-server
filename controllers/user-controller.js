@@ -269,27 +269,25 @@ const sendPaymentMethodUpdatedEmail = async (user_id) => {
   try {
     const user = await User.findOne({ _id: user_id });
     if (!user) {
-      console.error('User not found for ID:', user_id); 
+      console.error('User not found for ID:', user_id);
       return;
     }
 
-   
-
     const mailOptions = {
-      from: process.env.EMAIL_FROM || `Daily Inspirational Quotes <${process.env.EMAIL_USER}>`, 
+      from: process.env.EMAIL_FROM || `Daily Inspirational Quotes <${process.env.EMAIL_USER}>`,
       to: user.email,
       subject: 'Payment Method Updated - Daily Inspirational Quotes',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
           <h2>Payment Method Updated</h2>
-          <p>We have updated your payment method.</p> 
+          <p>We have updated your payment method.</p>
           <p>Your new payment method is ${user.cardBrand} ending in ${user.cardLastFour}.</p>
           <p>If you have any questions or need assistance, please contact our support team.</p>
           <p>Thank you for your understanding.</p>
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
             <p style="color: #666; font-size: 14px;">This is an automated notification from DailyInspire.</p>
           </div>
-        </div>    
+        </div>
       `
     };
 
